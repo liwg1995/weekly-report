@@ -45,21 +45,37 @@ NOTIFY_RETRY_BASE_DELAY_MS="200"
 
 ## 2. 发布前检查
 
-在仓库根目录执行:
+在仓库根目录执行（推荐）:
 
 ```bash
-pnpm install
-pnpm --filter api prisma:generate
-pnpm --filter api exec prisma migrate deploy
-pnpm test
-pnpm --filter api test:e2e
 pnpm regression:local
+```
+
+完整发布前就绪检查（含构建、迁移、可选测试）:
+
+```bash
+pnpm release:readiness
+```
+
+如数据库或 e2e 条件暂时不可用，可先只执行构建与迁移校验:
+
+```bash
+SKIP_TESTS=1 pnpm release:readiness
+```
+
+如数据库完全不可达，可先完成代码与构建校验（跳过迁移）:
+
+```bash
+SKIP_TESTS=1 SKIP_MIGRATE=1 pnpm release:readiness
 ```
 
 通过标准:
 
-- 单元测试与集成测试全部通过
-- API e2e 通过（覆盖登录、提交、审批、模板配置、版本回滚）
+- `pnpm --filter api test`、`pnpm --filter api test:e2e`、`pnpm --filter web test` 全部通过（当 `SKIP_TESTS=0`）
+- `pnpm --filter api build`、`pnpm --filter web build` 全部通过
+- `pnpm --filter api prisma:generate` 与 `pnpm --filter api exec prisma migrate deploy` 通过
+- `GET /health` 可访问（API 已启动场景）
+- 数据库迁移执行成功，包含模板脱敏字段:
 - 数据库迁移执行成功，包含模板脱敏字段:
   - `review_export_templates.diff_export_mask_sensitive`
   - `review_export_template_versions.diff_export_mask_sensitive`

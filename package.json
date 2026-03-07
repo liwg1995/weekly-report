@@ -4,6 +4,7 @@
   "packageManager": "pnpm@10.15.0",
   "scripts": {
     "test": "pnpm -r test",
-    "regression:local": "bash ./scripts/local-regression.sh"
+    "regression:local": "bash ./scripts/local-regression.sh",
+    "release:readiness": "bash ./scripts/release-readiness.sh"
   }
 }

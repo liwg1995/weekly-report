@@ -300,7 +300,7 @@ export default function ManagerPerformancePage() {
             当前仅实现字段结构与流程占位，后续将与审批建议、周报目标完成度联动。
           </p>
         </div>
-        <button type="button" onClick={logoutWithConfirm}>退出登录</button>
+        <button type="button" onClick={() => logoutWithConfirm()}>退出登录</button>
       </header>
 
       {loading ? <p>加载中...</p> : null}

@@ -105,7 +105,7 @@ export default function EmployeeFeedbackPage() {
     <main style={{ maxWidth: "980px", margin: "0 auto", padding: "24px" }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
         <h1 style={{ marginTop: 0 }}>审批反馈</h1>
-        <button type="button" onClick={logoutWithConfirm}>
+        <button type="button" onClick={() => logoutWithConfirm()}>
           退出登录
         </button>
       </div>

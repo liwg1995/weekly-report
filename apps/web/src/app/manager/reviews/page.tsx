@@ -1335,7 +1335,7 @@ export default function ManagerReviewsPage() {
           <h1>待我审批</h1>
           <p className="reviews-subtitle">优先处理超期单，批量操作可显著提升提交率与审批效率</p>
         </div>
-        <button type="button" onClick={logoutWithConfirm}>
+        <button type="button" onClick={() => logoutWithConfirm()}>
           退出登录
         </button>
       </div>
@@ -1951,7 +1951,7 @@ export default function ManagerReviewsPage() {
               <option value="gbk">GBK</option>
             </select>
           </label>
-          <button type="button" onClick={exportLogsCsv}>
+          <button type="button" onClick={() => exportLogsCsv()}>
             导出CSV
           </button>
         </div>

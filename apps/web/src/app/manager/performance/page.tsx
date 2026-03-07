@@ -6,6 +6,7 @@ import { getSessionUser, logoutWithConfirm, requireRole } from "../../../lib/aut
 
 type PerformanceDimension = {
   id: number;
+  version: number;
   key: string;
   name: string;
   weight: number;
@@ -15,6 +16,7 @@ type PerformanceDimension = {
 type PerformanceCycle = {
   id: number;
   name: string;
+  version: number;
   startDate: string;
   endDate: string;
   status: "DRAFT" | "ACTIVE" | "CLOSED";
@@ -43,6 +45,7 @@ export default function ManagerPerformancePage() {
   const [editingCycleName, setEditingCycleName] = useState("");
   const [editingCycleStartDate, setEditingCycleStartDate] = useState("");
   const [editingCycleEndDate, setEditingCycleEndDate] = useState("");
+  const [editingCycleVersion, setEditingCycleVersion] = useState(1);
   const [editingCycleStatus, setEditingCycleStatus] = useState<"DRAFT" | "ACTIVE" | "CLOSED">("DRAFT");
   const [dimensionCycleId, setDimensionCycleId] = useState("");
   const [dimensionKey, setDimensionKey] = useState("");
@@ -50,6 +53,7 @@ export default function ManagerPerformancePage() {
   const [dimensionWeight, setDimensionWeight] = useState("20");
   const [dimensionMetricHint, setDimensionMetricHint] = useState("");
   const [editingDimensionId, setEditingDimensionId] = useState<number | null>(null);
+  const [editingDimensionVersion, setEditingDimensionVersion] = useState(1);
   const [editingDimensionKey, setEditingDimensionKey] = useState("");
   const [editingDimensionName, setEditingDimensionName] = useState("");
   const [editingDimensionWeight, setEditingDimensionWeight] = useState("20");
@@ -163,6 +167,7 @@ export default function ManagerPerformancePage() {
     setEditingCycleStartDate(cycle.startDate.slice(0, 10));
     setEditingCycleEndDate(cycle.endDate.slice(0, 10));
     setEditingCycleStatus(cycle.status);
+    setEditingCycleVersion(cycle.version);
   };
 
   const cancelEditCycle = () => {
@@ -181,7 +186,8 @@ export default function ManagerPerformancePage() {
         name: editingCycleName.trim(),
         startDate: editingCycleStartDate,
         endDate: editingCycleEndDate,
-        status: editingCycleStatus
+        status: editingCycleStatus,
+        version: editingCycleVersion
       });
       setNotice("绩效周期已更新");
       setEditingCycleId(null);
@@ -217,6 +223,7 @@ export default function ManagerPerformancePage() {
 
   const beginEditDimension = (dimension: PerformanceDimension) => {
     setEditingDimensionId(dimension.id);
+    setEditingDimensionVersion(dimension.version);
     setEditingDimensionKey(dimension.key);
     setEditingDimensionName(dimension.name);
     setEditingDimensionWeight(String(dimension.weight));
@@ -239,7 +246,8 @@ export default function ManagerPerformancePage() {
         key: editingDimensionKey.trim(),
         name: editingDimensionName.trim(),
         weight: Number(editingDimensionWeight),
-        metricHint: editingDimensionMetricHint.trim()
+        metricHint: editingDimensionMetricHint.trim(),
+        version: editingDimensionVersion
       });
       setNotice("绩效维度已更新");
       setEditingDimensionId(null);

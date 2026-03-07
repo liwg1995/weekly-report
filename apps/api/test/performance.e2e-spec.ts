@@ -140,7 +140,8 @@ describe("Performance (e2e)", () => {
       .set("Authorization", `Bearer ${adminToken}`)
       .send({
         name: `2026Q10 审计测试（已更新）${Date.now()}`,
-        status: "ACTIVE"
+        status: "ACTIVE",
+        version: createdCycle.body.version
       })
       .expect(200);
 
@@ -221,7 +222,8 @@ describe("Performance (e2e)", () => {
       .set("Authorization", `Bearer ${adminToken}`)
       .send({
         weight: 40,
-        metricHint: "按质量指标改进幅度与闭环率"
+        metricHint: "按质量指标改进幅度与闭环率",
+        version: createdDimension.body.version
       })
       .expect(200);
 
@@ -255,6 +257,93 @@ describe("Performance (e2e)", () => {
     expect(dimensionDeleteLog).toBeTruthy();
     expect(dimensionDeleteLog?.beforeJson).toBeTruthy();
     expect(dimensionDeleteLog?.afterJson).toBeNull();
+
+    await request(app.getHttpServer())
+      .delete(`/performance/cycles/${createdCycle.body.id}`)
+      .set("Authorization", `Bearer ${adminToken}`)
+      .expect(200);
+  });
+
+  it("should reject cycle update when version mismatches", async () => {
+    const createdCycle = await request(app.getHttpServer())
+      .post("/performance/cycles")
+      .set("Authorization", `Bearer ${adminToken}`)
+      .send({
+        name: "2026Q12 乐观锁测试（周期）",
+        startDate: "2026-12-01",
+        endDate: "2026-12-31",
+        status: "DRAFT"
+      })
+      .expect(201);
+
+    await request(app.getHttpServer())
+      .patch(`/performance/cycles/${createdCycle.body.id}`)
+      .set("Authorization", `Bearer ${adminToken}`)
+      .send({
+        name: "2026Q12 乐观锁测试（周期）-已更新",
+        version: createdCycle.body.version
+      })
+      .expect(200);
+
+    const conflict = await request(app.getHttpServer())
+      .patch(`/performance/cycles/${createdCycle.body.id}`)
+      .set("Authorization", `Bearer ${adminToken}`)
+      .send({
+        name: "2026Q12 乐观锁测试（周期）-冲突",
+        version: createdCycle.body.version
+      })
+      .expect(409);
+
+    expect(conflict.body.message).toContain("版本冲突");
+
+    await request(app.getHttpServer())
+      .delete(`/performance/cycles/${createdCycle.body.id}`)
+      .set("Authorization", `Bearer ${adminToken}`)
+      .expect(200);
+  });
+
+  it("should reject dimension update when version mismatches", async () => {
+    const createdCycle = await request(app.getHttpServer())
+      .post("/performance/cycles")
+      .set("Authorization", `Bearer ${adminToken}`)
+      .send({
+        name: "2026Q13 乐观锁测试（维度）",
+        startDate: "2026-12-01",
+        endDate: "2026-12-31",
+        status: "DRAFT"
+      })
+      .expect(201);
+
+    const createdDimension = await request(app.getHttpServer())
+      .post(`/performance/cycles/${createdCycle.body.id}/dimensions`)
+      .set("Authorization", `Bearer ${adminToken}`)
+      .send({
+        key: "lock-test",
+        name: "乐观锁测试",
+        weight: 20,
+        metricHint: "并发更新冲突检测"
+      })
+      .expect(201);
+
+    await request(app.getHttpServer())
+      .patch(`/performance/dimensions/${createdDimension.body.id}`)
+      .set("Authorization", `Bearer ${adminToken}`)
+      .send({
+        weight: 30,
+        version: createdDimension.body.version
+      })
+      .expect(200);
+
+    const conflict = await request(app.getHttpServer())
+      .patch(`/performance/dimensions/${createdDimension.body.id}`)
+      .set("Authorization", `Bearer ${adminToken}`)
+      .send({
+        weight: 40,
+        version: createdDimension.body.version
+      })
+      .expect(409);
+
+    expect(conflict.body.message).toContain("版本冲突");
 
     await request(app.getHttpServer())
       .delete(`/performance/cycles/${createdCycle.body.id}`)
@@ -331,7 +420,8 @@ describe("Performance (e2e)", () => {
       .set("Authorization", `Bearer ${adminToken}`)
       .send({
         name: "2026Q5 绩效周期（已更新）",
-        status: "ACTIVE"
+        status: "ACTIVE",
+        version: createdCycle.body.version
       })
       .expect(200);
 
@@ -372,7 +462,8 @@ describe("Performance (e2e)", () => {
       .set("Authorization", `Bearer ${adminToken}`)
       .send({
         name: "效率改进",
-        metricHint: "按交付效率与复盘速度评估"
+        metricHint: "按交付效率与复盘速度评估",
+        version: createdDimension.body.version
       })
       .expect(200);
 
@@ -426,7 +517,10 @@ describe("Performance (e2e)", () => {
     await request(app.getHttpServer())
       .patch(`/performance/dimensions/${first.body.id}`)
       .set("Authorization", `Bearer ${adminToken}`)
-      .send({ weight: 70 })
+      .send({
+        weight: 70,
+        version: first.body.version
+      })
       .expect(400);
 
     await request(app.getHttpServer())

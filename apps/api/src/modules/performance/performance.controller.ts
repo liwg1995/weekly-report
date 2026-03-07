@@ -74,6 +74,7 @@ export class PerformanceController {
       startDate?: string;
       endDate?: string;
       status?: PerformanceCycleStatus;
+      version?: number;
     }
   ) {
     return this.performanceService.updateCycle(
@@ -98,6 +99,7 @@ export class PerformanceController {
       name?: string;
       weight?: number;
       metricHint?: string;
+      version?: number;
     }
   ) {
     return this.performanceService.updateDimension(

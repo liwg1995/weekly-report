@@ -1,4 +1,9 @@
-import { BadRequestException, Injectable, NotFoundException } from "@nestjs/common";
+import {
+  BadRequestException,
+  ConflictException,
+  Injectable,
+  NotFoundException
+} from "@nestjs/common";
 import { PerformanceCycleStatus, Prisma } from "@prisma/client";
 import { PrismaService } from "../prisma/prisma.service";
 
@@ -117,11 +122,11 @@ export class PerformanceService {
 
   async createCycle(
     input: {
-    name: string;
-    startDate: string;
-    endDate: string;
-    status?: PerformanceCycleStatus;
-  },
+      name: string;
+      startDate: string;
+      endDate: string;
+      status?: PerformanceCycleStatus;
+    },
     actorUserId: number
   ) {
     const name = input.name.trim();
@@ -165,8 +170,7 @@ export class PerformanceService {
 
   async addDimension(
     cycleId: number,
-    input: { key: string; name: string; weight: number; metricHint: string }
-    ,
+    input: { key: string; name: string; weight: number; metricHint: string },
     actorUserId: number
   ) {
     const cycle = await this.prisma.performanceCycle.findUnique({
@@ -235,86 +239,109 @@ export class PerformanceService {
       startDate?: string;
       endDate?: string;
       status?: PerformanceCycleStatus;
+      version?: number;
     },
     actorUserId: number
   ) {
     return this.prisma.$transaction(async (tx) => {
-    const cycle = await tx.performanceCycle.findUnique({
-      where: { id },
-      select: { id: true, startDate: true, endDate: true, name: true, status: true }
-    });
-    if (!cycle) {
-      throw new NotFoundException("绩效周期不存在");
-    }
-
-    const hasPayload = Object.keys(input).length > 0;
-    if (!hasPayload) {
-      throw new BadRequestException("更新内容不能为空");
-    }
-
-    const data: {
-      name?: string;
-      startDate?: Date;
-      endDate?: Date;
-      status?: PerformanceCycleStatus;
-    } = {};
-
-    const nextStartDate = (() => {
-      if (!Object.prototype.hasOwnProperty.call(input, "startDate")) {
-        return cycle.startDate;
-      }
-      if (!input.startDate) {
-        throw new BadRequestException("开始日期不能为空");
-      }
-      const date = new Date(input.startDate);
-      if (Number.isNaN(date.getTime())) {
-        throw new BadRequestException("开始日期格式无效");
-      }
-      data.startDate = date;
-      return date;
-    })();
-
-    const nextEndDate = (() => {
-      if (!Object.prototype.hasOwnProperty.call(input, "endDate")) {
-        return cycle.endDate;
-      }
-      if (!input.endDate) {
-        throw new BadRequestException("结束日期不能为空");
-      }
-      const date = new Date(input.endDate);
-      if (Number.isNaN(date.getTime())) {
-        throw new BadRequestException("结束日期格式无效");
-      }
-      data.endDate = date;
-      return date;
-    })();
-
-    if (nextEndDate < nextStartDate) {
-      throw new BadRequestException("结束日期不能早于开始日期");
-    }
-
-    if (Object.prototype.hasOwnProperty.call(input, "name")) {
-      const name = input.name?.trim();
-      if (!name) {
-        throw new BadRequestException("周期名称不能为空");
-      }
-      if (name.length > 64) {
-        throw new BadRequestException("周期名称长度不能超过64个字符");
-      }
-      data.name = name;
-    }
-
-    if (Object.prototype.hasOwnProperty.call(input, "status")) {
-      if (!Object.values(PerformanceCycleStatus).includes(input.status as PerformanceCycleStatus)) {
-        throw new BadRequestException("绩效状态无效");
-      }
-      data.status = input.status;
-    }
-
-      const updated = await tx.performanceCycle.update({
+      const cycle = await tx.performanceCycle.findUnique({
         where: { id },
+        select: { id: true, startDate: true, endDate: true, name: true, status: true, version: true }
+      });
+      if (!cycle) {
+        throw new NotFoundException("绩效周期不存在");
+      }
+
+      if (typeof input.version !== "number" || !Number.isInteger(input.version)) {
+        throw new BadRequestException("缺少版本号");
+      }
+      if (input.version <= 0) {
+        throw new BadRequestException("版本号无效");
+      }
+
+      const hasPayload = Object.keys(input).some((key) => key !== "version");
+      if (!hasPayload) {
+        throw new BadRequestException("更新内容不能为空");
+      }
+
+      const data: {
+        name?: string;
+        startDate?: Date;
+        endDate?: Date;
+        status?: PerformanceCycleStatus;
+        version?: { increment: 1 };
+      } = {
+        version: { increment: 1 }
+      };
+
+      const nextStartDate = (() => {
+        if (!Object.prototype.hasOwnProperty.call(input, "startDate")) {
+          return cycle.startDate;
+        }
+        if (!input.startDate) {
+          throw new BadRequestException("开始日期不能为空");
+        }
+        const date = new Date(input.startDate);
+        if (Number.isNaN(date.getTime())) {
+          throw new BadRequestException("开始日期格式无效");
+        }
+        data.startDate = date;
+        return date;
+      })();
+
+      const nextEndDate = (() => {
+        if (!Object.prototype.hasOwnProperty.call(input, "endDate")) {
+          return cycle.endDate;
+        }
+        if (!input.endDate) {
+          throw new BadRequestException("结束日期不能为空");
+        }
+        const date = new Date(input.endDate);
+        if (Number.isNaN(date.getTime())) {
+          throw new BadRequestException("结束日期格式无效");
+        }
+        data.endDate = date;
+        return date;
+      })();
+
+      if (nextEndDate < nextStartDate) {
+        throw new BadRequestException("结束日期不能早于开始日期");
+      }
+
+      if (Object.prototype.hasOwnProperty.call(input, "name")) {
+        const name = input.name?.trim();
+        if (!name) {
+          throw new BadRequestException("周期名称不能为空");
+        }
+        if (name.length > 64) {
+          throw new BadRequestException("周期名称长度不能超过64个字符");
+        }
+        data.name = name;
+      }
+
+      if (Object.prototype.hasOwnProperty.call(input, "status")) {
+        if (!Object.values(PerformanceCycleStatus).includes(input.status as PerformanceCycleStatus)) {
+          throw new BadRequestException("绩效状态无效");
+        }
+        data.status = input.status;
+      }
+
+      const { count } = await tx.performanceCycle.updateMany({
+        where: { id, version: input.version },
         data
       });
+      if (count === 0) {
+        throw new ConflictException("版本冲突，请刷新后重试");
+      }
+
+      const updated = await tx.performanceCycle.findUnique({
+        where: { id },
+        include: { dimensions: true }
+      });
+
+      if (!updated) {
+        throw new NotFoundException("绩效周期不存在");
+      }
 
       await this.createAuditLog(tx, {
         actorUserId,
@@ -335,9 +362,9 @@ export class PerformanceService {
         where: { id },
         include: { dimensions: true }
       });
-    if (!cycle) {
-      throw new NotFoundException("绩效周期不存在");
-    }
+      if (!cycle) {
+        throw new NotFoundException("绩效周期不存在");
+      }
 
       await tx.performanceDimension.deleteMany({
         where: { cycleId: id }
@@ -366,28 +393,47 @@ export class PerformanceService {
       name?: string;
       weight?: number;
       metricHint?: string;
+      version?: number;
     },
     actorUserId: number
   ) {
     return this.prisma.$transaction(async (tx) => {
-    const dimension = await tx.performanceDimension.findUnique({
-      where: { id },
-      include: { cycle: { select: { id: true } } }
-    });
-    if (!dimension) {
-      throw new NotFoundException("绩效维度不存在");
-    }
+      const dimension = await tx.performanceDimension.findUnique({
+        where: { id },
+        select: {
+          id: true,
+          cycleId: true,
+          key: true,
+          name: true,
+          weight: true,
+          metricHint: true,
+          version: true
+        }
+      });
+      if (!dimension) {
+        throw new NotFoundException("绩效维度不存在");
+      }
 
-    if (Object.keys(input).length === 0) {
-      throw new BadRequestException("更新内容不能为空");
-    }
+      if (typeof input.version !== "number" || !Number.isInteger(input.version)) {
+        throw new BadRequestException("缺少版本号");
+      }
+      if (input.version <= 0) {
+        throw new BadRequestException("版本号无效");
+      }
 
-    const data: {
-      key?: string;
-      name?: string;
-      weight?: number;
-      metricHint?: string;
-    } = {};
+      if (Object.keys(input).every((key) => key === "version")) {
+        throw new BadRequestException("更新内容不能为空");
+      }
+
+      const data: {
+        key?: string;
+        name?: string;
+        weight?: number;
+        metricHint?: string;
+        version?: { increment: 1 };
+      } = {
+        version: { increment: 1 }
+      };
 
       if (Object.prototype.hasOwnProperty.call(input, "key")) {
         const key = input.key?.trim();
@@ -461,10 +507,20 @@ export class PerformanceService {
         }
       }
 
-      const updated = await tx.performanceDimension.update({
-        where: { id },
+      const { count } = await tx.performanceDimension.updateMany({
+        where: { id, version: input.version },
         data
       });
+      if (count === 0) {
+        throw new ConflictException("版本冲突，请刷新后重试");
+      }
+
+      const updated = await tx.performanceDimension.findUnique({
+        where: { id }
+      });
+      if (!updated) {
+        throw new NotFoundException("绩效维度不存在");
+      }
 
       await this.createAuditLog(tx, {
         actorUserId,

@@ -28,6 +28,7 @@ describe("ManagerPerformancePage", () => {
         cycles: [
           {
             id: 1,
+            version: 1,
             name: "2026Q2 绩效周期（占位）",
             startDate: "2026-04-01T00:00:00.000Z",
             endDate: "2026-06-30T23:59:59.000Z",
@@ -35,6 +36,7 @@ describe("ManagerPerformancePage", () => {
             dimensions: [
               {
                 id: 11,
+                version: 1,
                 key: "delivery",
                 name: "交付质量",
                 weight: 40,
@@ -135,6 +137,7 @@ describe("ManagerPerformancePage", () => {
           cycles: [
             {
               id: 12,
+              version: 1,
               name: "2026Q2 绩效周期",
               startDate: "2026-04-01T00:00:00.000Z",
               endDate: "2026-06-30T23:59:59.000Z",
@@ -175,7 +178,10 @@ describe("ManagerPerformancePage", () => {
     await waitFor(() => {
       expect(fetchMock).toHaveBeenCalledWith(
         "/api/performance/cycles/12",
-        expect.objectContaining({ method: "PATCH" })
+        expect.objectContaining({
+          method: "PATCH",
+          body: expect.stringContaining("\"version\":1")
+        })
       );
     });
   });
@@ -191,6 +197,7 @@ describe("ManagerPerformancePage", () => {
           cycles: [
             {
               id: 13,
+              version: 1,
               name: "待删周期",
               startDate: "2026-04-01T00:00:00.000Z",
               endDate: "2026-06-30T23:59:59.000Z",
@@ -251,6 +258,7 @@ describe("ManagerPerformancePage", () => {
               dimensions: [
                 {
                   id: 141,
+                  version: 1,
                   key: "quality",
                   name: "质量",
                   weight: 40,
@@ -292,7 +300,10 @@ describe("ManagerPerformancePage", () => {
     await waitFor(() => {
       expect(fetchMock).toHaveBeenCalledWith(
         "/api/performance/dimensions/141",
-        expect.objectContaining({ method: "PATCH" })
+        expect.objectContaining({
+          method: "PATCH",
+          body: expect.stringContaining("\"version\":1")
+        })
       );
     });
   });
@@ -315,6 +326,7 @@ describe("ManagerPerformancePage", () => {
               dimensions: [
                 {
                   id: 151,
+                  version: 1,
                   key: "delivery",
                   name: "交付",
                   weight: 60,

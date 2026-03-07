@@ -76,7 +76,6 @@ SKIP_TESTS=1 SKIP_MIGRATE=1 pnpm release:readiness
 - `pnpm --filter api prisma:generate` 与 `pnpm --filter api exec prisma migrate deploy` 通过
 - `GET /health` 可访问（API 已启动场景）
 - 数据库迁移执行成功，包含模板脱敏字段:
-- 数据库迁移执行成功，包含模板脱敏字段:
   - `review_export_templates.diff_export_mask_sensitive`
   - `review_export_template_versions.diff_export_mask_sensitive`
 

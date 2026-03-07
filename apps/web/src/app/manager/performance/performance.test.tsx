@@ -127,6 +127,85 @@ describe("ManagerPerformancePage", () => {
     });
   });
 
+  it("validates disabled state and unified required prompt for performance cycle create", async () => {
+    const fetchMock = jest.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({ cycles: [], todos: [] })
+    }) as typeof fetch;
+    globalThis.fetch = fetchMock;
+
+    render(<ManagerPerformancePage />);
+
+    await waitFor(() => {
+      expect(screen.getByLabelText("绩效周期名称")).toBeInTheDocument();
+    });
+
+    const cycleNameInput = screen.getByLabelText("绩效周期名称");
+    const cycleStartInput = screen.getByLabelText("周期开始日期");
+    const cycleEndInput = screen.getByLabelText("周期结束日期");
+    const createButton = screen.getByRole("button", { name: "创建绩效周期" });
+
+    expect(createButton).toBeDisabled();
+    fireEvent.change(cycleNameInput, { target: { value: "2026Q4" } });
+    expect(createButton).toBeDisabled();
+    fireEvent.change(cycleStartInput, { target: { value: "2026-10-01" } });
+    fireEvent.change(cycleEndInput, { target: { value: "2026-12-31" } });
+
+    expect(createButton).toBeEnabled();
+    fireEvent.click(createButton);
+    expect(screen.queryByText("请先补全必填项后再提交。")).not.toBeInTheDocument();
+  });
+
+  it("validates disabled state for dimension create form", async () => {
+    const fetchMock = jest
+      .fn()
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => ({
+          cycles: [
+            {
+              id: 10,
+              version: 1,
+              name: "2026Q3",
+              startDate: "2026-07-01T00:00:00.000Z",
+              endDate: "2026-09-30T23:59:59.000Z",
+              status: "DRAFT",
+              dimensions: []
+            }
+          ],
+          todos: []
+        })
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 400,
+        json: async () => ({ message: "bad request" })
+      });
+    globalThis.fetch = fetchMock as typeof fetch;
+
+    render(<ManagerPerformancePage />);
+
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: "新增绩效维度" })).toBeInTheDocument();
+    });
+
+    const createDimensionButton = screen.getByRole("button", { name: "新增绩效维度" });
+    expect(createDimensionButton).toBeDisabled();
+
+    const cycleSelect = screen.getByLabelText("维度所属周期");
+    const dimensionKey = screen.getByLabelText("维度Key");
+    fireEvent.change(cycleSelect, { target: { value: "10" } });
+    fireEvent.change(dimensionKey, { target: { value: "kpi" } });
+    expect(createDimensionButton).toBeDisabled();
+
+    fireEvent.change(screen.getByLabelText("维度名称"), { target: { value: "指标" } });
+    fireEvent.change(screen.getByLabelText("指标说明"), { target: { value: "说明" } });
+    expect(createDimensionButton).toBeEnabled();
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
   it("updates a performance cycle", async () => {
     const fetchMock = jest
       .fn()

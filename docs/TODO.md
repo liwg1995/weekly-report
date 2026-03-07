@@ -38,7 +38,7 @@
   - [x] 维度 Key 唯一性与空值、长度校验的单元级覆盖
 - [x] 绩效配置变更做审计日志（记录变更前后字段）
 - [x] 绩效配置加入乐观并发控制（更新时带版本号）
-- [ ] `/manager/performance` 的提示文案与禁用态统一收口（前端体验收敛）
+- [x] `/manager/performance` 的提示文案与禁用态统一收口（前端体验收敛）
 - [x] 准备生产发布演练清单（按 `docs/deployment/2026-03-06-release-checklist.md` 扩展）
 - [x] 新增生产就绪脚本 `pnpm release:readiness`
 

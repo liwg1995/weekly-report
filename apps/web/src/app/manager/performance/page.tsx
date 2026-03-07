@@ -59,6 +59,7 @@ export default function ManagerPerformancePage() {
   const [editingDimensionWeight, setEditingDimensionWeight] = useState("20");
   const [editingDimensionMetricHint, setEditingDimensionMetricHint] = useState("");
   const sessionUser = getSessionUser();
+  const requiredTextError = "请先补全必填项后再提交。";
 
   const loadOverview = async () => {
     setLoading(true);
@@ -108,11 +109,16 @@ export default function ManagerPerformancePage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  const canCreateCycle = Boolean(cycleName.trim()) && Boolean(cycleStartDate) && Boolean(cycleEndDate);
+  const canCreateDimension = Boolean(dimensionCycleId) && Boolean(dimensionKey.trim()) && Boolean(dimensionName.trim()) && Boolean(dimensionMetricHint.trim());
+  const canSaveCycle = Boolean(editingCycleName.trim()) && Boolean(editingCycleStartDate) && Boolean(editingCycleEndDate);
+  const canSaveDimension = Boolean(editingDimensionKey.trim()) && Boolean(editingDimensionName.trim()) && Boolean(editingDimensionMetricHint.trim());
+
   const createCycle = async () => {
     setError("");
     setNotice("");
-    if (!cycleName.trim() || !cycleStartDate || !cycleEndDate) {
-      setError("请完整填写周期信息");
+    if (!canCreateCycle) {
+      setError(requiredTextError);
       return;
     }
     try {
@@ -137,8 +143,8 @@ export default function ManagerPerformancePage() {
     setError("");
     setNotice("");
     const cycleId = Number(dimensionCycleId);
-    if (!cycleId || !dimensionKey.trim() || !dimensionName.trim() || !dimensionMetricHint.trim()) {
-      setError("请完整填写维度信息");
+    if (!canCreateDimension || !cycleId) {
+      setError(requiredTextError);
       return;
     }
     try {
@@ -177,8 +183,8 @@ export default function ManagerPerformancePage() {
   const saveEditCycle = async (cycleId: number) => {
     setError("");
     setNotice("");
-    if (!editingCycleName.trim() || !editingCycleStartDate || !editingCycleEndDate) {
-      setError("周期名称与日期不能为空");
+    if (!canSaveCycle) {
+      setError(requiredTextError);
       return;
     }
     try {
@@ -237,8 +243,8 @@ export default function ManagerPerformancePage() {
   const saveEditDimension = async (dimensionId: number) => {
     setError("");
     setNotice("");
-    if (!editingDimensionKey.trim() || !editingDimensionName.trim() || !editingDimensionMetricHint.trim()) {
-      setError("维度字段不能为空");
+    if (!canSaveDimension) {
+      setError(requiredTextError);
       return;
     }
     try {
@@ -330,7 +336,9 @@ export default function ManagerPerformancePage() {
               <option value="CLOSED">CLOSED</option>
             </select>
           </label>
-          <button type="button" onClick={() => void createCycle()}>创建绩效周期</button>
+          <button type="button" disabled={!canCreateCycle} onClick={() => void createCycle()}>
+            创建绩效周期
+          </button>
         </div>
       </section>
 
@@ -368,7 +376,9 @@ export default function ManagerPerformancePage() {
             指标说明
             <input aria-label="维度指标说明" value={dimensionMetricHint} onChange={(event) => setDimensionMetricHint(event.target.value)} />
           </label>
-          <button type="button" onClick={() => void createDimension()}>新增绩效维度</button>
+          <button type="button" disabled={!canCreateDimension} onClick={() => void createDimension()}>
+            新增绩效维度
+          </button>
         </div>
       </section>
 
@@ -422,7 +432,12 @@ export default function ManagerPerformancePage() {
                     <option value="CLOSED">CLOSED</option>
                   </select>
                 </label>
-                <button type="button" onClick={() => void saveEditCycle(cycle.id)} aria-label={`保存周期-${cycle.id}`}>
+                <button
+                  type="button"
+                  disabled={!canSaveCycle}
+                  onClick={() => void saveEditCycle(cycle.id)}
+                  aria-label={`保存周期-${cycle.id}`}
+                >
                   保存
                 </button>
                 <button type="button" onClick={cancelEditCycle} aria-label={`取消编辑周期-${cycle.id}`}>
@@ -481,6 +496,7 @@ export default function ManagerPerformancePage() {
                       </label>
                       <button
                         type="button"
+                        disabled={!canSaveDimension}
                         onClick={() => void saveEditDimension(dimension.id)}
                         aria-label={`保存维度-${dimension.id}`}
                       >

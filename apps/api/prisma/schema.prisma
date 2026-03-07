@@ -1,0 +1,240 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserStatus {
+  ACTIVE
+  INACTIVE
+}
+
+enum ReportStatus {
+  DRAFT
+  PENDING_APPROVAL
+  APPROVED
+  REJECTED
+  OVERDUE
+}
+
+enum CycleStatus {
+  OPEN
+  CLOSED
+}
+
+enum ImportStatus {
+  PENDING
+  SUCCESS
+  FAILED
+}
+
+enum PerformanceCycleStatus {
+  DRAFT
+  ACTIVE
+  CLOSED
+}
+
+model User {
+  id              Int              @id @default(autoincrement())
+  username        String           @unique
+  passwordHash    String           @map("password_hash")
+  realName        String           @map("real_name")
+  email           String?
+  status          UserStatus       @default(ACTIVE)
+  managedDepts    Department[]     @relation("DepartmentManager")
+  userDepartments UserDepartment[]
+  reports         WeeklyReport[]
+  reviews         ReportReview[]
+  audits          AuditLog[]
+  importJobs      ImportJob[]
+  reviewExportTemplates ReviewExportTemplate[]
+  createdAt       DateTime         @default(now()) @map("created_at")
+
+  @@map("users")
+}
+
+model Department {
+  id               Int              @id @default(autoincrement())
+  name             String
+  parentId         Int?             @map("parent_id")
+  managerUserId    Int?             @map("manager_user_id")
+  reportDueWeekday Int              @default(5) @map("report_due_weekday")
+  manager          User?            @relation("DepartmentManager", fields: [managerUserId], references: [id])
+  users            UserDepartment[]
+  cycles           ReportCycle[]
+  createdAt        DateTime         @default(now()) @map("created_at")
+
+  @@map("departments")
+}
+
+model UserDepartment {
+  id           Int        @id @default(autoincrement())
+  userId       Int        @map("user_id")
+  departmentId Int        @map("department_id")
+  roleInDept   String     @default("member") @map("role_in_dept")
+  isPrimary    Boolean    @default(false) @map("is_primary")
+  user         User       @relation(fields: [userId], references: [id])
+  department   Department @relation(fields: [departmentId], references: [id])
+
+  @@unique([userId, departmentId])
+  @@map("user_departments")
+}
+
+model ReportCycle {
+  id           Int          @id @default(autoincrement())
+  departmentId Int          @map("department_id")
+  weekStart    DateTime     @map("week_start")
+  weekEnd      DateTime     @map("week_end")
+  dueAt        DateTime     @map("due_at")
+  status       CycleStatus  @default(OPEN)
+  department   Department   @relation(fields: [departmentId], references: [id])
+  reports      WeeklyReport[]
+
+  @@map("report_cycles")
+}
+
+model WeeklyReport {
+  id            Int            @id @default(autoincrement())
+  cycleId       Int            @map("cycle_id")
+  userId        Int            @map("user_id")
+  status        ReportStatus   @default(DRAFT)
+  thisWeekText  String         @map("this_week_text")
+  nextWeekText  String         @map("next_week_text")
+  risksText     String         @default("") @map("risks_text")
+  needsHelpText String         @default("") @map("needs_help_text")
+  submittedAt   DateTime?      @map("submitted_at")
+  approvedAt    DateTime?      @map("approved_at")
+  rejectedAt    DateTime?      @map("rejected_at")
+  updatedAt     DateTime       @updatedAt @map("updated_at")
+  cycle         ReportCycle    @relation(fields: [cycleId], references: [id])
+  user          User           @relation(fields: [userId], references: [id])
+  reviews       ReportReview[]
+
+  @@map("weekly_reports")
+}
+
+model ReportReview {
+  id             Int        @id @default(autoincrement())
+  reportId       Int        @map("report_id")
+  reviewerUserId Int        @map("reviewer_user_id")
+  decision       String
+  comment        String
+  report         WeeklyReport @relation(fields: [reportId], references: [id])
+  reviewer       User         @relation(fields: [reviewerUserId], references: [id])
+  createdAt      DateTime     @default(now()) @map("created_at")
+
+  @@map("report_reviews")
+}
+
+model AuditLog {
+  id         Int      @id @default(autoincrement())
+  actorUserId Int?    @map("actor_user_id")
+  action     String
+  targetType String   @map("target_type")
+  targetId   String   @map("target_id")
+  beforeJson Json?    @map("before_json")
+  afterJson  Json?    @map("after_json")
+  actor      User?    @relation(fields: [actorUserId], references: [id])
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  @@map("audit_logs")
+}
+
+model ImportJob {
+  id           Int        @id @default(autoincrement())
+  operatorUserId Int?     @map("operator_user_id")
+  fileName     String     @map("file_name")
+  status       ImportStatus @default(PENDING)
+  successCount Int        @default(0) @map("success_count")
+  failCount    Int        @default(0) @map("fail_count")
+  resultJson   Json?      @map("result_json")
+  operator     User?      @relation(fields: [operatorUserId], references: [id])
+  createdAt    DateTime   @default(now()) @map("created_at")
+
+  @@map("import_jobs")
+}
+
+model FeatureFlag {
+  key         String  @id
+  enabled     Boolean @default(false)
+  description String
+
+  @@map("feature_flags")
+}
+
+model ReviewExportTemplate {
+  id          String   @id @db.VarChar(64)
+  ownerUserId Int      @map("owner_user_id")
+  name        String
+  pinned      Boolean  @default(false)
+  diffExportMaskSensitive Boolean @default(true) @map("diff_export_mask_sensitive")
+  filtersJson Json     @map("filters_json")
+  columnsJson Json     @map("columns_json")
+  encoding    String   @default("utf-8")
+  createdAt   DateTime @map("created_at")
+  owner       User     @relation(fields: [ownerUserId], references: [id])
+  versions    ReviewExportTemplateVersion[]
+
+  @@unique([ownerUserId, name])
+  @@index([ownerUserId])
+  @@map("review_export_templates")
+}
+
+model ReviewExportTemplateVersion {
+  id          Int      @id @default(autoincrement())
+  templateId  String   @map("template_id") @db.VarChar(64)
+  ownerUserId Int      @map("owner_user_id")
+  name        String
+  pinned      Boolean  @default(false)
+  diffExportMaskSensitive Boolean @default(true) @map("diff_export_mask_sensitive")
+  filtersJson Json     @map("filters_json")
+  columnsJson Json     @map("columns_json")
+  encoding    String   @default("utf-8")
+  createdAt   DateTime @default(now()) @map("created_at")
+  template    ReviewExportTemplate @relation(fields: [templateId], references: [id])
+
+  @@index([templateId, createdAt])
+  @@index([ownerUserId])
+  @@map("review_export_template_versions")
+}
+
+model PerformanceCycle {
+  id         Int                    @id @default(autoincrement())
+  name       String
+  startDate  DateTime               @map("start_date")
+  endDate    DateTime               @map("end_date")
+  status     PerformanceCycleStatus @default(DRAFT)
+  createdAt  DateTime               @default(now()) @map("created_at")
+  updatedAt  DateTime               @updatedAt @map("updated_at")
+  dimensions PerformanceDimension[]
+
+  @@map("performance_cycles")
+}
+
+model PerformanceDimension {
+  id         Int              @id @default(autoincrement())
+  cycleId    Int              @map("cycle_id")
+  key        String           @db.VarChar(64)
+  name       String
+  weight     Int
+  metricHint String           @map("metric_hint")
+  createdAt  DateTime         @default(now()) @map("created_at")
+  cycle      PerformanceCycle @relation(fields: [cycleId], references: [id])
+
+  @@unique([cycleId, key])
+  @@index([cycleId])
+  @@map("performance_dimensions")
+}
+
+model PerformanceTodo {
+  id        Int      @id @default(autoincrement())
+  ownerRole String   @map("owner_role")
+  title     String
+  done      Boolean  @default(false)
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@map("performance_todos")
+}

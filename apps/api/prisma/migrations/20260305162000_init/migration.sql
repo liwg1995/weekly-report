@@ -1,0 +1,2 @@
+-- Initial schema migration placeholder.
+-- Apply using: pnpm --filter api prisma migrate dev

@@ -228,6 +228,8 @@ export default function ManagerReviewsPage() {
   const [filterLeaders, setFilterLeaders] = useState<
     Array<{ id: number; username: string; realName: string }>
   >([]);
+  const [filterDepartmentKeyword, setFilterDepartmentKeyword] = useState("");
+  const [filterLeaderKeyword, setFilterLeaderKeyword] = useState("");
   const [filterOptionsLoading, setFilterOptionsLoading] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -1447,6 +1449,12 @@ export default function ManagerReviewsPage() {
   const listEnd = Math.min(totalItems, listPage * listPageSize);
   const selectedDepartmentLabel = filterDepartments.find((x) => x.id === listDepartmentId)?.name;
   const selectedLeader = filterLeaders.find((x) => x.id === listLeaderUserId);
+  const filteredDepartments = filterDepartments.filter((item) =>
+    item.name.toLowerCase().includes(filterDepartmentKeyword.trim().toLowerCase())
+  );
+  const filteredLeaders = filterLeaders.filter((item) =>
+    `${item.realName}${item.username}`.toLowerCase().includes(filterLeaderKeyword.trim().toLowerCase())
+  );
   const activeFilterTags = [
     listKeyword ? `关键词：${listKeyword}` : "",
     selectedDepartmentLabel ? `部门：${selectedDepartmentLabel}` : "",
@@ -1559,12 +1567,19 @@ export default function ManagerReviewsPage() {
             }}
           >
             <option value="">全部部门</option>
-            {filterDepartments.map((dept) => (
+            {filteredDepartments.map((dept) => (
               <option key={dept.id} value={String(dept.id)}>
                 {dept.name}
               </option>
             ))}
           </select>
+          <input
+            aria-label="部门选项搜索"
+            placeholder="搜索部门"
+            value={filterDepartmentKeyword}
+            onChange={(event) => setFilterDepartmentKeyword(event.target.value)}
+            style={{ width: "120px" }}
+          />
           <select
             aria-label="直属领导筛选"
             value={listLeaderUserId ? String(listLeaderUserId) : ""}
@@ -1574,12 +1589,19 @@ export default function ManagerReviewsPage() {
             }}
           >
             <option value="">全部直属领导</option>
-            {filterLeaders.map((leader) => (
+            {filteredLeaders.map((leader) => (
               <option key={leader.id} value={String(leader.id)}>
                 {leader.realName}（{leader.username}）
               </option>
             ))}
           </select>
+          <input
+            aria-label="直属领导选项搜索"
+            placeholder="搜索领导"
+            value={filterLeaderKeyword}
+            onChange={(event) => setFilterLeaderKeyword(event.target.value)}
+            style={{ width: "120px" }}
+          />
           <button type="button" onClick={() => void loadFilterOptions()} disabled={filterOptionsLoading}>
             {filterOptionsLoading ? "加载中..." : "加载筛选项"}
           </button>

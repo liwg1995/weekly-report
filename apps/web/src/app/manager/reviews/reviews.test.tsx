@@ -726,6 +726,59 @@ describe("ManagerReviewsPage", () => {
     });
   });
 
+  it("supports filtering department and leader options by keyword", async () => {
+    const fetchMock = jest
+      .fn()
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => ({
+          items: [{ id: 971, thisWeekText: "选项搜索", status: "PENDING_APPROVAL" }],
+          total: 1,
+          page: 1,
+          pageSize: 20
+        })
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => ({ items: [] })
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => ({
+          departments: [
+            { id: 100, name: "研发中心" },
+            { id: 101, name: "市场部" }
+          ],
+          leaders: [
+            { id: 201, username: "zhangsan", realName: "张三" },
+            { id: 202, username: "lisi", realName: "李四" }
+          ]
+        })
+      });
+    globalThis.fetch = fetchMock as typeof fetch;
+
+    render(<ManagerReviewsPage />);
+    await waitFor(() => {
+      expect(screen.getByText("选项搜索")).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "加载筛选项" }));
+    await waitFor(() => {
+      expect(screen.getByLabelText("部门筛选")).toBeInTheDocument();
+    });
+
+    fireEvent.change(screen.getByLabelText("部门选项搜索"), { target: { value: "研发" } });
+    expect(screen.getByRole("option", { name: "研发中心" })).toBeInTheDocument();
+    expect(screen.queryByRole("option", { name: "市场部" })).not.toBeInTheDocument();
+
+    fireEvent.change(screen.getByLabelText("直属领导选项搜索"), { target: { value: "李" } });
+    expect(screen.getByRole("option", { name: "李四（lisi）" })).toBeInTheDocument();
+    expect(screen.queryByRole("option", { name: "张三（zhangsan）" })).not.toBeInTheDocument();
+  });
+
   it("exports current logs as csv", async () => {
     const createObjectURL = jest.fn(() => "blob:weekly-report");
     const revokeObjectURL = jest.fn();

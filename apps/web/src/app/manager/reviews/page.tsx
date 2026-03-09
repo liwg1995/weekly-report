@@ -331,7 +331,7 @@ export default function ManagerReviewsPage() {
     }
   };
 
-  const loadFilterOptions = async () => {
+  const loadFilterOptions = async (options?: { quiet?: boolean }) => {
     setFilterOptionsLoading(true);
     try {
       const data = await apiGet<ReviewFilterOptionsResponse>(
@@ -340,7 +340,9 @@ export default function ManagerReviewsPage() {
       setFilterDepartments(data.departments ?? []);
       setFilterLeaders(data.leaders ?? []);
     } catch {
-      setError("加载筛选选项失败，请稍后重试");
+      if (!options?.quiet) {
+        setError("加载筛选选项失败，请稍后重试");
+      }
     } finally {
       setFilterOptionsLoading(false);
     }
@@ -479,6 +481,28 @@ export default function ManagerReviewsPage() {
     void load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      return;
+    }
+    if (filterDepartments.length > 0 || filterLeaders.length > 0 || filterOptionsLoading) {
+      return;
+    }
+    const maybeWindow = window as Window & {
+      requestIdleCallback?: (callback: () => void) => number;
+      cancelIdleCallback?: (id: number) => void;
+    };
+    if (!maybeWindow.requestIdleCallback) {
+      return;
+    }
+    const idleId = maybeWindow.requestIdleCallback(() => {
+      void loadFilterOptions({ quiet: true });
+    });
+    return () => {
+      maybeWindow.cancelIdleCallback?.(idleId);
+    };
+  }, [filterDepartments.length, filterLeaders.length, filterOptionsLoading]);
 
   useEffect(() => {
     if (typeof window === "undefined") {
@@ -1603,7 +1627,11 @@ export default function ManagerReviewsPage() {
             style={{ width: "120px" }}
           />
           <button type="button" onClick={() => void loadFilterOptions()} disabled={filterOptionsLoading}>
-            {filterOptionsLoading ? "加载中..." : "加载筛选项"}
+            {filterOptionsLoading
+              ? "加载中..."
+              : filterDepartments.length > 0 || filterLeaders.length > 0
+                ? "刷新筛选项"
+                : "加载筛选项"}
           </button>
           <label>
             <input

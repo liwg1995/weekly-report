@@ -857,7 +857,7 @@ export default function ManagerReviewsPage() {
       try {
         const query = buildTemplateOwnerQuery();
         await fetch(
-          `${process.env.NEXT_PUBLIC_API_BASE_URL ?? ""}/api/audit-logs/review-templates/${id}${query}`,
+          `${process.env.NEXT_PUBLIC_API_BASE_URL ?? ""}/audit-logs/review-templates/${id}${query}`,
           {
             method: "DELETE",
             headers: {

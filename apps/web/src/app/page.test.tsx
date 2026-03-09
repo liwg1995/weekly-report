@@ -19,11 +19,24 @@ describe("HomePage", () => {
     });
   });
 
-  it("redirects manager role to reviews page", async () => {
+  it("redirects super admin role to org page", async () => {
     window.localStorage.setItem("accessToken", "token");
     window.localStorage.setItem(
       "sessionUser",
       JSON.stringify({ username: "admin", roles: ["SUPER_ADMIN"] })
+    );
+
+    render(<HomePage />);
+    await waitFor(() => {
+      expect(navigateTo).toHaveBeenCalledWith("/manager/org");
+    });
+  });
+
+  it("redirects manager role to reviews page", async () => {
+    window.localStorage.setItem("accessToken", "token");
+    window.localStorage.setItem(
+      "sessionUser",
+      JSON.stringify({ username: "leader", roles: ["MANAGER"] })
     );
 
     render(<HomePage />);

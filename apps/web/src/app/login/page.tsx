@@ -30,10 +30,14 @@ export default function LoginPage() {
       saveSessionUser({ username: res.user.username, roles: res.user.roles ?? [] });
       setSuccess("登录成功");
       const roles = res.user.roles ?? [];
-      const isManagerSide = roles.some((role) =>
-        ["SUPER_ADMIN", "DEPT_ADMIN", "MANAGER"].includes(role)
+      const isOrgAdmin = roles.some((role) =>
+        ["SUPER_ADMIN", "DEPT_ADMIN"].includes(role)
       );
-      navigateTo(isManagerSide ? "/manager/reviews" : "/employee/feedback");
+      if (isOrgAdmin) {
+        navigateTo("/manager/org");
+        return;
+      }
+      navigateTo(roles.includes("MANAGER") ? "/manager/reviews" : "/employee/feedback");
     } catch (err) {
       if (err instanceof ApiClientError && err.status === 401) {
         setError("用户名或密码错误");

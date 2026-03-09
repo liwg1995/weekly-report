@@ -42,7 +42,7 @@ describe("LoginPage", () => {
       expect(window.localStorage.getItem("accessToken")).toBe("token-123");
       expect(window.localStorage.getItem("sessionUser")).toContain("\"SUPER_ADMIN\"");
       expect(screen.getByText("登录成功")).toBeInTheDocument();
-      expect(navigateTo).toHaveBeenCalledWith("/manager/reviews");
+      expect(navigateTo).toHaveBeenCalledWith("/manager/org");
     });
   });
 

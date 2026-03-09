@@ -44,6 +44,9 @@ model User {
   realName        String           @map("real_name")
   email           String?
   status          UserStatus       @default(ACTIVE)
+  leaderUserId    Int?             @map("leader_user_id")
+  leader          User?            @relation("UserLeader", fields: [leaderUserId], references: [id])
+  directReports   User[]           @relation("UserLeader")
   managedDepts    Department[]     @relation("DepartmentManager")
   userDepartments UserDepartment[]
   reports         WeeklyReport[]

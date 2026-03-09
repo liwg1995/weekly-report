@@ -20,7 +20,11 @@ const buildUrl = (path: string) => {
     return path;
   }
   const base = process.env.NEXT_PUBLIC_API_BASE_URL ?? "";
-  return `${base}${path}`;
+  if (!base) {
+    return path;
+  }
+  const normalizedPath = path.startsWith("/api/") ? path.slice(4) : path;
+  return `${base}${normalizedPath}`;
 };
 
 const parseErrorMessage = async (response: Response) => {

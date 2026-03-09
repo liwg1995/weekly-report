@@ -13,11 +13,15 @@ export default function HomePage() {
       return;
     }
 
-    const managerRoles = ["SUPER_ADMIN", "DEPT_ADMIN", "MANAGER"];
-    const isManagerSide = sessionUser.roles.some((role) =>
-      managerRoles.includes(role)
+    const isOrgAdmin = sessionUser.roles.some((role) =>
+      ["SUPER_ADMIN", "DEPT_ADMIN"].includes(role)
     );
-    navigateTo(isManagerSide ? "/manager/reviews" : "/employee/feedback");
+    if (isOrgAdmin) {
+      navigateTo("/manager/org");
+      return;
+    }
+    const isManager = sessionUser.roles.includes("MANAGER");
+    navigateTo(isManager ? "/manager/reviews" : "/employee/feedback");
   }, []);
 
   return <main style={{ padding: "24px" }}>跳转中...</main>;

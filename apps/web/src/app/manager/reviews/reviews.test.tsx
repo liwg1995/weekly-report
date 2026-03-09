@@ -647,6 +647,85 @@ describe("ManagerReviewsPage", () => {
     });
   });
 
+  it("loads filter options and supports active filter tags clear all", async () => {
+    const fetchMock = jest
+      .fn()
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => ({
+          items: [{ id: 961, thisWeekText: "筛选标签", status: "PENDING_APPROVAL" }],
+          total: 1,
+          page: 1,
+          pageSize: 20
+        })
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => ({ items: [] })
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => ({
+          departments: [{ id: 10, name: "研发部" }],
+          leaders: [{ id: 20, username: "leader20", realName: "李经理" }]
+        })
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => ({
+          items: [{ id: 962, thisWeekText: "筛选后", status: "PENDING_APPROVAL" }],
+          total: 1,
+          page: 1,
+          pageSize: 20
+        })
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => ({
+          items: [{ id: 963, thisWeekText: "清空后", status: "PENDING_APPROVAL" }],
+          total: 1,
+          page: 1,
+          pageSize: 20
+        })
+      });
+    globalThis.fetch = fetchMock as typeof fetch;
+
+    render(<ManagerReviewsPage />);
+    await waitFor(() => {
+      expect(screen.getByText("筛选标签")).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "加载筛选项" }));
+    await waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledWith(
+        "/api/weekly-reports/filter-options?status=PENDING_APPROVAL",
+        expect.objectContaining({ method: "GET" })
+      );
+    });
+
+    fireEvent.change(screen.getByLabelText("部门筛选"), { target: { value: "10" } });
+    fireEvent.change(screen.getByLabelText("直属领导筛选"), { target: { value: "20" } });
+    fireEvent.click(screen.getByRole("button", { name: "查询" }));
+
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: "直属领导：李经理（leader20） ×" })).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "清空全部筛选" })).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "清空全部筛选" }));
+    await waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledWith(
+        "/api/weekly-reports?status=PENDING_APPROVAL",
+        expect.objectContaining({ method: "GET" })
+      );
+    });
+  });
+
   it("exports current logs as csv", async () => {
     const createObjectURL = jest.fn(() => "blob:weekly-report");
     const revokeObjectURL = jest.fn();

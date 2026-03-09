@@ -34,6 +34,11 @@ type ReportListResponse = {
   pageSize?: number;
 };
 
+type ReviewFilterOptionsResponse = {
+  departments: Array<{ id: number; name: string }>;
+  leaders: Array<{ id: number; username: string; realName: string }>;
+};
+
 type AuditItem = {
   id: number;
   action: string;
@@ -214,11 +219,16 @@ export default function ManagerReviewsPage() {
   const [listPageSize, setListPageSize] = useState(20);
   const [listKeywordInput, setListKeywordInput] = useState("");
   const [listKeyword, setListKeyword] = useState("");
-  const [listDepartmentIdInput, setListDepartmentIdInput] = useState("");
   const [listDepartmentId, setListDepartmentId] = useState<number | undefined>(undefined);
-  const [listLeaderUserIdInput, setListLeaderUserIdInput] = useState("");
   const [listLeaderUserId, setListLeaderUserId] = useState<number | undefined>(undefined);
   const [listOverdueFirst, setListOverdueFirst] = useState(false);
+  const [filterDepartments, setFilterDepartments] = useState<Array<{ id: number; name: string }>>(
+    []
+  );
+  const [filterLeaders, setFilterLeaders] = useState<
+    Array<{ id: number; username: string; realName: string }>
+  >([]);
+  const [filterOptionsLoading, setFilterOptionsLoading] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
@@ -316,6 +326,21 @@ export default function ManagerReviewsPage() {
       setLogs(data.items);
     } catch {
       // Ignore audit log load failures to avoid blocking review flow.
+    }
+  };
+
+  const loadFilterOptions = async () => {
+    setFilterOptionsLoading(true);
+    try {
+      const data = await apiGet<ReviewFilterOptionsResponse>(
+        "/api/weekly-reports/filter-options?status=PENDING_APPROVAL"
+      );
+      setFilterDepartments(data.departments ?? []);
+      setFilterLeaders(data.leaders ?? []);
+    } catch {
+      setError("加载筛选选项失败，请稍后重试");
+    } finally {
+      setFilterOptionsLoading(false);
     }
   };
 
@@ -1420,6 +1445,14 @@ export default function ManagerReviewsPage() {
   const listTotalPages = Math.max(1, Math.ceil(totalItems / listPageSize));
   const listStart = totalItems === 0 ? 0 : (listPage - 1) * listPageSize + 1;
   const listEnd = Math.min(totalItems, listPage * listPageSize);
+  const selectedDepartmentLabel = filterDepartments.find((x) => x.id === listDepartmentId)?.name;
+  const selectedLeader = filterLeaders.find((x) => x.id === listLeaderUserId);
+  const activeFilterTags = [
+    listKeyword ? `关键词：${listKeyword}` : "",
+    selectedDepartmentLabel ? `部门：${selectedDepartmentLabel}` : "",
+    selectedLeader ? `直属领导：${selectedLeader.realName}（${selectedLeader.username}）` : "",
+    listOverdueFirst ? "逾期优先" : ""
+  ].filter(Boolean);
   const formatLogTime = (value: string) =>
     new Date(value).toLocaleString("zh-CN", {
       month: "2-digit",
@@ -1517,20 +1550,39 @@ export default function ManagerReviewsPage() {
             <option value="20">20条/页</option>
             <option value="50">50条/页</option>
           </select>
-          <input
-            aria-label="部门ID筛选"
-            placeholder="部门ID"
-            value={listDepartmentIdInput}
-            onChange={(event) => setListDepartmentIdInput(event.target.value)}
-            style={{ width: "96px" }}
-          />
-          <input
-            aria-label="直属领导ID筛选"
-            placeholder="直属领导ID"
-            value={listLeaderUserIdInput}
-            onChange={(event) => setListLeaderUserIdInput(event.target.value)}
-            style={{ width: "120px" }}
-          />
+          <select
+            aria-label="部门筛选"
+            value={listDepartmentId ? String(listDepartmentId) : ""}
+            onChange={(event) => {
+              const value = event.target.value;
+              setListDepartmentId(value ? Number(value) : undefined);
+            }}
+          >
+            <option value="">全部部门</option>
+            {filterDepartments.map((dept) => (
+              <option key={dept.id} value={String(dept.id)}>
+                {dept.name}
+              </option>
+            ))}
+          </select>
+          <select
+            aria-label="直属领导筛选"
+            value={listLeaderUserId ? String(listLeaderUserId) : ""}
+            onChange={(event) => {
+              const value = event.target.value;
+              setListLeaderUserId(value ? Number(value) : undefined);
+            }}
+          >
+            <option value="">全部直属领导</option>
+            {filterLeaders.map((leader) => (
+              <option key={leader.id} value={String(leader.id)}>
+                {leader.realName}（{leader.username}）
+              </option>
+            ))}
+          </select>
+          <button type="button" onClick={() => void loadFilterOptions()} disabled={filterOptionsLoading}>
+            {filterOptionsLoading ? "加载中..." : "加载筛选项"}
+          </button>
           <label>
             <input
               type="checkbox"
@@ -1560,25 +1612,13 @@ export default function ManagerReviewsPage() {
             type="button"
             onClick={() => {
               const nextKeyword = listKeywordInput.trim();
-              const parsedDepartmentId = Number(listDepartmentIdInput.trim());
-              const nextDepartmentId =
-                listDepartmentIdInput.trim() && !Number.isNaN(parsedDepartmentId)
-                  ? parsedDepartmentId
-                  : undefined;
-              const parsedLeaderUserId = Number(listLeaderUserIdInput.trim());
-              const nextLeaderUserId =
-                listLeaderUserIdInput.trim() && !Number.isNaN(parsedLeaderUserId)
-                  ? parsedLeaderUserId
-                  : undefined;
               setListKeyword(nextKeyword);
-              setListDepartmentId(nextDepartmentId);
-              setListLeaderUserId(nextLeaderUserId);
               void loadPendingReports({
                 page: 1,
                 pageSize: listPageSize,
                 keyword: nextKeyword,
-                departmentId: nextDepartmentId,
-                leaderUserId: nextLeaderUserId,
+                departmentId: listDepartmentId,
+                leaderUserId: listLeaderUserId,
                 overdueFirst: listOverdueFirst
               });
             }}
@@ -1590,9 +1630,7 @@ export default function ManagerReviewsPage() {
             onClick={() => {
               setListKeywordInput("");
               setListKeyword("");
-              setListDepartmentIdInput("");
               setListDepartmentId(undefined);
-              setListLeaderUserIdInput("");
               setListLeaderUserId(undefined);
               setListOverdueFirst(false);
               void loadPendingReports({
@@ -1611,6 +1649,108 @@ export default function ManagerReviewsPage() {
             第 {listPage} / {listTotalPages} 页，显示 {listStart}-{listEnd} / {totalItems}
           </span>
         </div>
+        {activeFilterTags.length > 0 ? (
+          <div className="review-filter-tags">
+            {listKeyword ? (
+              <button
+                type="button"
+                className="review-filter-tag"
+                onClick={() => {
+                  setListKeywordInput("");
+                  setListKeyword("");
+                  void loadPendingReports({
+                    page: 1,
+                    pageSize: listPageSize,
+                    keyword: "",
+                    departmentId: listDepartmentId,
+                    leaderUserId: listLeaderUserId,
+                    overdueFirst: listOverdueFirst
+                  });
+                }}
+              >
+                关键词：{listKeyword} ×
+              </button>
+            ) : null}
+            {selectedDepartmentLabel ? (
+              <button
+                type="button"
+                className="review-filter-tag"
+                onClick={() => {
+                  setListDepartmentId(undefined);
+                  void loadPendingReports({
+                    page: 1,
+                    pageSize: listPageSize,
+                    keyword: listKeyword,
+                    departmentId: undefined,
+                    leaderUserId: listLeaderUserId,
+                    overdueFirst: listOverdueFirst
+                  });
+                }}
+              >
+                部门：{selectedDepartmentLabel} ×
+              </button>
+            ) : null}
+            {selectedLeader ? (
+              <button
+                type="button"
+                className="review-filter-tag"
+                onClick={() => {
+                  setListLeaderUserId(undefined);
+                  void loadPendingReports({
+                    page: 1,
+                    pageSize: listPageSize,
+                    keyword: listKeyword,
+                    departmentId: listDepartmentId,
+                    leaderUserId: undefined,
+                    overdueFirst: listOverdueFirst
+                  });
+                }}
+              >
+                直属领导：{selectedLeader.realName}（{selectedLeader.username}） ×
+              </button>
+            ) : null}
+            {listOverdueFirst ? (
+              <button
+                type="button"
+                className="review-filter-tag"
+                onClick={() => {
+                  setListOverdueFirst(false);
+                  void loadPendingReports({
+                    page: 1,
+                    pageSize: listPageSize,
+                    keyword: listKeyword,
+                    departmentId: listDepartmentId,
+                    leaderUserId: listLeaderUserId,
+                    overdueFirst: false
+                  });
+                }}
+              >
+                逾期优先 ×
+              </button>
+            ) : null}
+            <button
+              type="button"
+              className="review-filter-clear"
+              onClick={() => {
+                setListKeywordInput("");
+                setListKeyword("");
+                setListDepartmentId(undefined);
+                setListLeaderUserId(undefined);
+                setListOverdueFirst(false);
+                void loadPendingReports({
+                  page: 1,
+                  pageSize: listPageSize,
+                  keyword: "",
+                  departmentId: undefined,
+                  leaderUserId: undefined,
+                  overdueFirst: false
+                });
+              }}
+            >
+              清空全部筛选
+            </button>
+          </div>
+        ) : null}
       </section>
       {!loading && !error && items.length === 0 ? <p>当前没有待审批周报。</p> : null}
       {!loading && !error && items.length > 0 ? (

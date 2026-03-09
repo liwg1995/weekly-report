@@ -22,7 +22,7 @@ export class ReviewsController {
   constructor(private readonly reviewsService: ReviewsService) {}
 
   @Post(":id/review")
-  @Roles("SUPER_ADMIN", "DEPT_ADMIN", "MANAGER")
+  @Roles("SUPER_ADMIN", "DEPT_ADMIN", "MANAGER", "LEADER")
   review(
     @Req() request: Request,
     @Param("id", ParseIntPipe) id: number,

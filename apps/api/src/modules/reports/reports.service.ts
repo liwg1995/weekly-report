@@ -1,5 +1,5 @@
 import { Injectable, NotFoundException } from "@nestjs/common";
-import { CycleStatus, ReportStatus } from "@prisma/client";
+import { CycleStatus, Prisma, ReportStatus } from "@prisma/client";
 import { PrismaService } from "../prisma/prisma.service";
 import { AuthUser } from "../auth/auth.service";
 
@@ -100,12 +100,109 @@ export class ReportsService {
     return report;
   }
 
-  async list(status?: string) {
-    const items = await this.prisma.weeklyReport.findMany({
-      where: status ? { status: status as ReportStatus } : undefined,
-      orderBy: { id: "desc" }
-    });
-    return { items };
+  async list(
+    user: AuthUser,
+    query?: { status?: string; page?: number; pageSize?: number; keyword?: string }
+  ) {
+    const page = Math.max(1, query?.page ?? 1);
+    const pageSize = Math.min(100, Math.max(1, query?.pageSize ?? 20));
+    const keyword = query?.keyword?.trim();
+    const status = query?.status;
+
+    const roleWheres: Prisma.WeeklyReportWhereInput[] = [];
+    if (user.roles.includes("SUPER_ADMIN")) {
+      roleWheres.push({});
+    }
+
+    if (user.roles.includes("MANAGER")) {
+      const managedDepts = await this.prisma.department.findMany({
+        where: { managerUserId: user.id },
+        select: { id: true }
+      });
+      const deptIds = managedDepts.map((item) => item.id);
+      if (deptIds.length > 0) {
+        roleWheres.push({
+          user: {
+            userDepartments: {
+              some: {
+                departmentId: { in: deptIds }
+              }
+            }
+          }
+        });
+      }
+    }
+
+    if (user.roles.includes("DEPT_ADMIN")) {
+      const adminDepts = await this.prisma.userDepartment.findMany({
+        where: {
+          userId: user.id,
+          roleInDept: "admin"
+        },
+        select: { departmentId: true }
+      });
+      const deptIds = adminDepts.map((item) => item.departmentId);
+      if (deptIds.length > 0) {
+        roleWheres.push({
+          user: {
+            userDepartments: {
+              some: {
+                departmentId: { in: deptIds }
+              }
+            }
+          }
+        });
+      }
+    }
+
+    if (user.roles.includes("LEADER")) {
+      roleWheres.push({
+        user: { leaderUserId: user.id }
+      });
+    }
+
+    if (user.roles.includes("EMPLOYEE")) {
+      roleWheres.push({ userId: user.id });
+    }
+
+    const where: Prisma.WeeklyReportWhereInput = {
+      ...(status ? { status: status as ReportStatus } : {}),
+      ...(keyword
+        ? {
+            OR: [
+              { thisWeekText: { contains: keyword } },
+              { nextWeekText: { contains: keyword } },
+              { risksText: { contains: keyword } },
+              { needsHelpText: { contains: keyword } },
+              { user: { username: { contains: keyword } } },
+              { user: { realName: { contains: keyword } } }
+            ]
+          }
+        : {}),
+      ...(roleWheres.length > 0 ? { AND: [{ OR: roleWheres }] } : {})
+    };
+
+    const [total, items] = await this.prisma.$transaction([
+      this.prisma.weeklyReport.count({ where }),
+      this.prisma.weeklyReport.findMany({
+        where,
+        orderBy: { id: "desc" },
+        skip: (page - 1) * pageSize,
+        take: pageSize,
+        include: {
+          user: {
+            select: {
+              id: true,
+              username: true,
+              realName: true,
+              leaderUserId: true
+            }
+          }
+        }
+      })
+    ]);
+
+    return { items, total, page, pageSize };
   }
 
   async myFeedback(userId: number) {

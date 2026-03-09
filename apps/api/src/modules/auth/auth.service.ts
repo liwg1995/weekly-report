@@ -81,6 +81,13 @@ export class AuthService implements OnModuleInit {
       roles.add("MANAGER");
     }
 
+    const directReportCount = await this.prisma.user.count({
+      where: { leaderUserId: userId }
+    });
+    if (directReportCount > 0) {
+      roles.add("LEADER");
+    }
+
     if (roles.size === 0) {
       roles.add("EMPLOYEE");
     }

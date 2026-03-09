@@ -336,7 +336,7 @@ export default function ManagerReviewsPage() {
   useEffect(() => {
     const load = async () => {
       const allowed = requireRole(
-        ["SUPER_ADMIN", "DEPT_ADMIN", "MANAGER"],
+        ["SUPER_ADMIN", "DEPT_ADMIN", "MANAGER", "LEADER"],
         "/employee/feedback"
       );
       if (!allowed) {

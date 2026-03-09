@@ -40,8 +40,19 @@ export class ReportsController {
   }
 
   @Get()
-  list(@Query("status") status?: string) {
-    return this.reportsService.list(status);
+  list(
+    @Req() request: Request,
+    @Query("status") status?: string,
+    @Query("page") page?: string,
+    @Query("pageSize") pageSize?: string,
+    @Query("keyword") keyword?: string
+  ) {
+    return this.reportsService.list((request as UserRequest).user, {
+      status,
+      page: page ? Number(page) : undefined,
+      pageSize: pageSize ? Number(pageSize) : undefined,
+      keyword
+    });
   }
 
   @Get("mine/feedback")

@@ -112,6 +112,19 @@ export class ReviewsService {
       return;
     }
 
+    if (reviewerRoles.includes("LEADER")) {
+      const directReport = await this.prisma.user.findFirst({
+        where: {
+          id: reportUserId,
+          leaderUserId: reviewerUserId
+        },
+        select: { id: true }
+      });
+      if (directReport) {
+        return;
+      }
+    }
+
     const reportUserDepts = await this.prisma.userDepartment.findMany({
       where: { userId: reportUserId },
       select: { departmentId: true }

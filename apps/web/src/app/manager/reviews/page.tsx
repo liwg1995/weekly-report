@@ -39,6 +39,10 @@ type ReviewFilterOptionsResponse = {
   leaders: Array<{ id: number; username: string; realName: string }>;
 };
 
+type CachedFilterOptions = ReviewFilterOptionsResponse & {
+  fetchedAt: string;
+};
+
 type AuditItem = {
   id: number;
   action: string;
@@ -51,6 +55,8 @@ type ExportColumn = "time" | "actor" | "action" | "targetId";
 
 const EXPORT_PREFERENCES_KEY = "manager_reviews_export_preferences";
 const EXPORT_HISTORY_KEY = "manager_reviews_export_history";
+const FILTER_OPTIONS_CACHE_KEY = "manager_reviews_filter_options_cache_v1";
+const FILTER_OPTIONS_CACHE_TTL_MS = 5 * 60 * 1000;
 const EXPORT_HISTORY_PAGE_SIZE = 5;
 const DEFAULT_EXPORT_COLUMNS: Record<ExportColumn, boolean> = {
   time: true,
@@ -212,7 +218,36 @@ const readExportHistory = (): ExportHistoryItem[] => {
   }
 };
 
+const readFilterOptionsCache = (): CachedFilterOptions => {
+  if (typeof window === "undefined") {
+    return { departments: [], leaders: [], fetchedAt: "" };
+  }
+  try {
+    const raw = window.localStorage.getItem(FILTER_OPTIONS_CACHE_KEY);
+    if (!raw) {
+      return { departments: [], leaders: [], fetchedAt: "" };
+    }
+    const parsed = JSON.parse(raw) as Partial<CachedFilterOptions>;
+    const fetchedAt = String(parsed.fetchedAt ?? "");
+    const fetchedAtTs = fetchedAt ? new Date(fetchedAt).getTime() : 0;
+    if (!fetchedAtTs || Number.isNaN(fetchedAtTs)) {
+      return { departments: [], leaders: [], fetchedAt: "" };
+    }
+    if (Date.now() - fetchedAtTs > FILTER_OPTIONS_CACHE_TTL_MS) {
+      return { departments: [], leaders: [], fetchedAt: "" };
+    }
+    return {
+      departments: Array.isArray(parsed.departments) ? parsed.departments : [],
+      leaders: Array.isArray(parsed.leaders) ? parsed.leaders : [],
+      fetchedAt
+    };
+  } catch {
+    return { departments: [], leaders: [], fetchedAt: "" };
+  }
+};
+
 export default function ManagerReviewsPage() {
+  const [cachedFilterOptions] = useState<CachedFilterOptions>(() => readFilterOptionsCache());
   const [items, setItems] = useState<ReviewItem[]>([]);
   const [totalItems, setTotalItems] = useState(0);
   const [listPage, setListPage] = useState(1);
@@ -223,11 +258,14 @@ export default function ManagerReviewsPage() {
   const [listLeaderUserId, setListLeaderUserId] = useState<number | undefined>(undefined);
   const [listOverdueFirst, setListOverdueFirst] = useState(false);
   const [filterDepartments, setFilterDepartments] = useState<Array<{ id: number; name: string }>>(
-    []
+    () => cachedFilterOptions.departments
   );
   const [filterLeaders, setFilterLeaders] = useState<
     Array<{ id: number; username: string; realName: string }>
-  >([]);
+  >(() => cachedFilterOptions.leaders);
+  const [filterOptionsFetchedAt, setFilterOptionsFetchedAt] = useState(
+    () => cachedFilterOptions.fetchedAt
+  );
   const [filterDepartmentKeyword, setFilterDepartmentKeyword] = useState("");
   const [filterLeaderKeyword, setFilterLeaderKeyword] = useState("");
   const [filterOptionsLoading, setFilterOptionsLoading] = useState(false);
@@ -331,14 +369,33 @@ export default function ManagerReviewsPage() {
     }
   };
 
-  const loadFilterOptions = async (options?: { quiet?: boolean }) => {
+  const loadFilterOptions = async (options?: { quiet?: boolean; force?: boolean }) => {
+    const lastTs = filterOptionsFetchedAt ? new Date(filterOptionsFetchedAt).getTime() : 0;
+    const isFresh = lastTs > 0 && Date.now() - lastTs <= FILTER_OPTIONS_CACHE_TTL_MS;
+    if (!options?.force && isFresh && (filterDepartments.length > 0 || filterLeaders.length > 0)) {
+      return;
+    }
     setFilterOptionsLoading(true);
     try {
       const data = await apiGet<ReviewFilterOptionsResponse>(
         "/api/weekly-reports/filter-options?status=PENDING_APPROVAL"
       );
-      setFilterDepartments(data.departments ?? []);
-      setFilterLeaders(data.leaders ?? []);
+      const nextDepartments = data.departments ?? [];
+      const nextLeaders = data.leaders ?? [];
+      const fetchedAt = new Date().toISOString();
+      setFilterDepartments(nextDepartments);
+      setFilterLeaders(nextLeaders);
+      setFilterOptionsFetchedAt(fetchedAt);
+      if (typeof window !== "undefined") {
+        window.localStorage.setItem(
+          FILTER_OPTIONS_CACHE_KEY,
+          JSON.stringify({
+            departments: nextDepartments,
+            leaders: nextLeaders,
+            fetchedAt
+          } satisfies CachedFilterOptions)
+        );
+      }
     } catch {
       if (!options?.quiet) {
         setError("加载筛选选项失败，请稍后重试");
@@ -1485,6 +1542,9 @@ export default function ManagerReviewsPage() {
     selectedLeader ? `直属领导：${selectedLeader.realName}（${selectedLeader.username}）` : "",
     listOverdueFirst ? "逾期优先" : ""
   ].filter(Boolean);
+  const filterOptionsUpdatedAtText = filterOptionsFetchedAt
+    ? new Date(filterOptionsFetchedAt).toLocaleString("zh-CN")
+    : "未加载";
   const formatLogTime = (value: string) =>
     new Date(value).toLocaleString("zh-CN", {
       month: "2-digit",
@@ -1626,13 +1686,20 @@ export default function ManagerReviewsPage() {
             onChange={(event) => setFilterLeaderKeyword(event.target.value)}
             style={{ width: "120px" }}
           />
-          <button type="button" onClick={() => void loadFilterOptions()} disabled={filterOptionsLoading}>
+          <button
+            type="button"
+            onClick={() => void loadFilterOptions({ force: true })}
+            disabled={filterOptionsLoading}
+          >
             {filterOptionsLoading
               ? "加载中..."
               : filterDepartments.length > 0 || filterLeaders.length > 0
                 ? "刷新筛选项"
                 : "加载筛选项"}
           </button>
+          <span style={{ color: "var(--muted)", fontSize: "12px" }}>
+            筛选项刷新：{filterOptionsUpdatedAtText}
+          </span>
           <label>
             <input
               type="checkbox"

@@ -779,6 +779,62 @@ describe("ManagerReviewsPage", () => {
     expect(screen.queryByRole("option", { name: "张三（zhangsan）" })).not.toBeInTheDocument();
   });
 
+  it("uses fresh filter options cache and supports manual refresh", async () => {
+    const fetchedAt = new Date().toISOString();
+    window.localStorage.setItem(
+      "manager_reviews_filter_options_cache_v1",
+      JSON.stringify({
+        departments: [{ id: 301, name: "缓存部门" }],
+        leaders: [{ id: 401, username: "cache_leader", realName: "缓存领导" }],
+        fetchedAt
+      })
+    );
+
+    const fetchMock = jest
+      .fn()
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => ({
+          items: [{ id: 981, thisWeekText: "缓存筛选项", status: "PENDING_APPROVAL" }],
+          total: 1,
+          page: 1,
+          pageSize: 20
+        })
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => ({ items: [] })
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => ({
+          departments: [{ id: 302, name: "刷新后部门" }],
+          leaders: [{ id: 402, username: "refreshed", realName: "刷新后领导" }]
+        })
+      });
+    globalThis.fetch = fetchMock as typeof fetch;
+
+    render(<ManagerReviewsPage />);
+    await waitFor(() => {
+      expect(screen.getByText("缓存筛选项")).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "刷新筛选项" })).toBeInTheDocument();
+      expect(screen.getByText(/筛选项刷新：/)).toBeInTheDocument();
+      expect(screen.getByRole("option", { name: "缓存部门" })).toBeInTheDocument();
+      expect(screen.getByRole("option", { name: "缓存领导（cache_leader）" })).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "刷新筛选项" }));
+    await waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledWith(
+        "/api/weekly-reports/filter-options?status=PENDING_APPROVAL",
+        expect.objectContaining({ method: "GET" })
+      );
+    });
+  });
+
   it("exports current logs as csv", async () => {
     const createObjectURL = jest.fn(() => "blob:weekly-report");
     const revokeObjectURL = jest.fn();

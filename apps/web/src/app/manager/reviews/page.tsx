@@ -10,6 +10,24 @@ type ReviewItem = {
   id: number;
   thisWeekText: string;
   status: string;
+  user?: {
+    id: number;
+    username: string;
+    realName: string;
+    leaderUserId?: number | null;
+    leader?: {
+      id: number;
+      username: string;
+      realName: string;
+    } | null;
+  } | null;
+};
+
+type ReportListResponse = {
+  items: ReviewItem[];
+  total?: number;
+  page?: number;
+  pageSize?: number;
 };
 
 type AuditItem = {
@@ -187,6 +205,11 @@ const readExportHistory = (): ExportHistoryItem[] => {
 
 export default function ManagerReviewsPage() {
   const [items, setItems] = useState<ReviewItem[]>([]);
+  const [totalItems, setTotalItems] = useState(0);
+  const [listPage, setListPage] = useState(1);
+  const [listPageSize, setListPageSize] = useState(20);
+  const [listKeywordInput, setListKeywordInput] = useState("");
+  const [listKeyword, setListKeyword] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
@@ -333,6 +356,50 @@ export default function ManagerReviewsPage() {
     return Number.isNaN(parsed) ? undefined : parsed;
   };
 
+  const loadPendingReports = async (
+    query?: {
+      page?: number;
+      pageSize?: number;
+      keyword?: string;
+    }
+  ) => {
+    const nextPage = query?.page ?? listPage;
+    const nextPageSize = query?.pageSize ?? listPageSize;
+    const nextKeyword = (query?.keyword ?? listKeyword).trim();
+    const params = new URLSearchParams();
+    params.set("status", "PENDING_APPROVAL");
+    const useLegacyDefaultQuery = nextPage === 1 && nextPageSize === 20 && !nextKeyword;
+    if (!useLegacyDefaultQuery) {
+      params.set("page", String(nextPage));
+      params.set("pageSize", String(nextPageSize));
+    }
+    if (nextKeyword) {
+      params.set("keyword", nextKeyword);
+    }
+
+    try {
+      const data = await apiGet<ReportListResponse>(`/api/weekly-reports?${params.toString()}`);
+      setItems(data.items ?? []);
+      setTotalItems(data.total ?? data.items.length);
+      setListPage(data.page ?? nextPage);
+      setListPageSize(data.pageSize ?? nextPageSize);
+      setSelectedIds([]);
+      setRejectTargetIds([]);
+      return data;
+    } catch (err) {
+      if (err instanceof ApiClientError && err.status === 403) {
+        setError("你当前没有审批权限，请联系管理员分配角色。");
+        return null;
+      }
+      if (err instanceof ApiClientError && err.status === 401) {
+        setError("登录已过期，请重新登录。");
+        return null;
+      }
+      setError("加载审批列表失败，请稍后重试。");
+      return null;
+    }
+  };
+
   useEffect(() => {
     const load = async () => {
       const allowed = requireRole(
@@ -345,31 +412,15 @@ export default function ManagerReviewsPage() {
       }
 
       try {
-        const data = await apiGet<{ items: ReviewItem[] }>(
-          "/api/weekly-reports?status=PENDING_APPROVAL"
-        );
-        setItems(data.items);
+        await loadPendingReports({ page: 1, pageSize: listPageSize, keyword: listKeyword });
         await loadAuditLogs();
-      } catch (err) {
-        if (err instanceof ApiClientError && err.status === 403) {
-          setError("你当前没有审批权限，请联系管理员分配角色。");
-          return;
-        }
-        if (err instanceof ApiClientError && err.status === 401) {
-          setError("登录已过期，请重新登录。");
-          return;
-        }
-        if (err instanceof ApiClientError) {
-          setError("加载审批列表失败，请稍后重试。");
-          return;
-        }
-        setError("网络异常，请检查连接后重试。");
       } finally {
         setLoading(false);
       }
     };
 
     void load();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
@@ -445,6 +496,7 @@ export default function ManagerReviewsPage() {
         )
       );
       setItems((prev) => prev.filter((item) => !reportIds.includes(item.id)));
+      setTotalItems((prev) => Math.max(0, prev - reportIds.length));
       setSelectedIds((prev) => prev.filter((id) => !reportIds.includes(id)));
       setNotice(
         decision === "APPROVED"
@@ -1320,6 +1372,9 @@ export default function ManagerReviewsPage() {
         : 100
       : Math.round((Math.abs(rangeDelta) / previousRangeCount) * 100);
   const rangeTrendText = `${trendArrow} ${trendPercent}%`;
+  const listTotalPages = Math.max(1, Math.ceil(totalItems / listPageSize));
+  const listStart = totalItems === 0 ? 0 : (listPage - 1) * listPageSize + 1;
+  const listEnd = Math.min(totalItems, listPage * listPageSize);
   const formatLogTime = (value: string) =>
     new Date(value).toLocaleString("zh-CN", {
       month: "2-digit",
@@ -1353,7 +1408,7 @@ export default function ManagerReviewsPage() {
       <section className="reviews-stat-grid">
         <article className="reviews-stat-card">
           <div className="reviews-stat-label">待审批总数</div>
-          <strong className="reviews-stat-value">{items.length}</strong>
+          <strong className="reviews-stat-value">{totalItems}</strong>
         </article>
         <article style={{ border: "1px solid var(--border)", borderRadius: "10px", padding: "10px" }}>
           <div className="reviews-stat-label">已选择</div>
@@ -1388,6 +1443,56 @@ export default function ManagerReviewsPage() {
             </button>
           </div>
         </article>
+      </section>
+      <section style={{ marginBottom: "12px", padding: "12px" }}>
+        <h2 style={{ marginTop: 0, fontSize: "16px" }}>列表筛选</h2>
+        <div style={{ display: "flex", flexWrap: "wrap", gap: "8px", alignItems: "center" }}>
+          <input
+            aria-label="周报关键词"
+            placeholder="关键词（内容/姓名/账号）"
+            value={listKeywordInput}
+            onChange={(event) => setListKeywordInput(event.target.value)}
+          />
+          <select
+            aria-label="每页条数"
+            value={String(listPageSize)}
+            onChange={(event) => {
+              const nextSize = Number(event.target.value);
+              void loadPendingReports({
+                page: 1,
+                pageSize: nextSize,
+                keyword: listKeywordInput.trim()
+              });
+            }}
+          >
+            <option value="10">10条/页</option>
+            <option value="20">20条/页</option>
+            <option value="50">50条/页</option>
+          </select>
+          <button
+            type="button"
+            onClick={() => {
+              const nextKeyword = listKeywordInput.trim();
+              setListKeyword(nextKeyword);
+              void loadPendingReports({ page: 1, pageSize: listPageSize, keyword: nextKeyword });
+            }}
+          >
+            查询
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setListKeywordInput("");
+              setListKeyword("");
+              void loadPendingReports({ page: 1, pageSize: listPageSize, keyword: "" });
+            }}
+          >
+            重置
+          </button>
+          <span style={{ color: "var(--muted)", fontSize: "12px" }}>
+            第 {listPage} / {listTotalPages} 页，显示 {listStart}-{listEnd} / {totalItems}
+          </span>
+        </div>
       </section>
       {!loading && !error && items.length === 0 ? <p>当前没有待审批周报。</p> : null}
       {!loading && !error && items.length > 0 ? (
@@ -1439,6 +1544,10 @@ export default function ManagerReviewsPage() {
                 <div style={{ color: "var(--muted)", marginTop: "6px" }}>
                   状态: {item.status}
                 </div>
+                <div style={{ color: "var(--muted)", marginTop: "4px", fontSize: "12px" }}>
+                  员工: {item.user?.realName || "-"}（{item.user?.username || "-"}） | 直属领导:{" "}
+                  {item.user?.leader?.realName || item.user?.leader?.username || "未设置"}
+                </div>
                 <div style={{ display: "flex", gap: "8px", marginTop: "10px" }}>
                   <button type="button" onClick={() => void reviewMany([item.id], "APPROVED")}>
                     通过
@@ -1456,6 +1565,34 @@ export default function ManagerReviewsPage() {
               </li>
             ))}
           </ul>
+          <div style={{ display: "flex", gap: "8px", marginTop: "10px", flexWrap: "wrap" }}>
+            <button
+              type="button"
+              disabled={listPage <= 1}
+              onClick={() =>
+                void loadPendingReports({
+                  page: Math.max(1, listPage - 1),
+                  pageSize: listPageSize,
+                  keyword: listKeyword
+                })
+              }
+            >
+              上一页
+            </button>
+            <button
+              type="button"
+              disabled={listPage >= listTotalPages}
+              onClick={() =>
+                void loadPendingReports({
+                  page: Math.min(listTotalPages, listPage + 1),
+                  pageSize: listPageSize,
+                  keyword: listKeyword
+                })
+              }
+            >
+              下一页
+            </button>
+          </div>
         </>
       ) : null}
       {rejectTargetIds.length > 0 ? (

@@ -195,7 +195,14 @@ export class ReportsService {
               id: true,
               username: true,
               realName: true,
-              leaderUserId: true
+              leaderUserId: true,
+              leader: {
+                select: {
+                  id: true,
+                  username: true,
+                  realName: true
+                }
+              }
             }
           }
         }

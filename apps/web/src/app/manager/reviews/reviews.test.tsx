@@ -502,6 +502,64 @@ describe("ManagerReviewsPage", () => {
     jest.useRealTimers();
   });
 
+  it("shows employee and leader info and supports next page query", async () => {
+    const fetchMock = jest
+      .fn()
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => ({
+          items: [
+            {
+              id: 901,
+              thisWeekText: "分页第一页",
+              status: "PENDING_APPROVAL",
+              user: {
+                id: 11,
+                username: "zhangsan",
+                realName: "张三",
+                leader: { id: 12, username: "leader01", realName: "李主管" }
+              }
+            }
+          ],
+          total: 21,
+          page: 1,
+          pageSize: 20
+        })
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => ({ items: [] })
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => ({
+          items: [],
+          total: 21,
+          page: 2,
+          pageSize: 20
+        })
+      });
+    globalThis.fetch = fetchMock as typeof fetch;
+
+    render(<ManagerReviewsPage />);
+    await waitFor(() => {
+      expect(screen.getByText(/员工: 张三（zhangsan）/)).toBeInTheDocument();
+      expect(screen.getByText(/直属领导: 李主管/)).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "下一页" }));
+
+    await waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledWith(
+        "/api/weekly-reports?status=PENDING_APPROVAL&page=2&pageSize=20",
+        expect.objectContaining({ method: "GET" })
+      );
+    });
+  });
+
   it("exports current logs as csv", async () => {
     const createObjectURL = jest.fn(() => "blob:weekly-report");
     const revokeObjectURL = jest.fn();

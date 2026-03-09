@@ -580,6 +580,73 @@ describe("ManagerReviewsPage", () => {
     });
   });
 
+  it("supports overdue quick filter and shows risk/help highlights", async () => {
+    const fetchMock = jest
+      .fn()
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => ({
+          items: [
+            {
+              id: 951,
+              thisWeekText: "逾期任务",
+              risksText: "联调阻塞",
+              needsHelpText: "需要产品确认方案",
+              status: "PENDING_APPROVAL",
+              isOverdue: true,
+              dueAt: "2026-03-06T10:00:00.000Z"
+            }
+          ],
+          total: 1,
+          page: 1,
+          pageSize: 20
+        })
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => ({ items: [] })
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => ({
+          items: [
+            {
+              id: 951,
+              thisWeekText: "逾期任务",
+              risksText: "联调阻塞",
+              needsHelpText: "需要产品确认方案",
+              status: "PENDING_APPROVAL",
+              isOverdue: true,
+              dueAt: "2026-03-06T10:00:00.000Z"
+            }
+          ],
+          total: 1,
+          page: 1,
+          pageSize: 20
+        })
+      });
+    globalThis.fetch = fetchMock as typeof fetch;
+
+    render(<ManagerReviewsPage />);
+    await waitFor(() => {
+      expect(screen.getByText("逾期任务")).toBeInTheDocument();
+      expect(screen.getByText(/风险提示：联调阻塞/)).toBeInTheDocument();
+      expect(screen.getByText(/协助诉求：需要产品确认方案/)).toBeInTheDocument();
+      expect(screen.getByText(/已逾期/)).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "只看逾期" }));
+    await waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledWith(
+        "/api/weekly-reports?status=PENDING_APPROVAL&page=1&pageSize=20&overdueFirst=true",
+        expect.objectContaining({ method: "GET" })
+      );
+    });
+  });
+
   it("exports current logs as csv", async () => {
     const createObjectURL = jest.fn(() => "blob:weekly-report");
     const revokeObjectURL = jest.fn();

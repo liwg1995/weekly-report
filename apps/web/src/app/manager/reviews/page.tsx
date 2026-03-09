@@ -9,6 +9,8 @@ import "./reviews.css";
 type ReviewItem = {
   id: number;
   thisWeekText: string;
+  risksText?: string;
+  needsHelpText?: string;
   status: string;
   dueAt?: string;
   isOverdue?: boolean;
@@ -1541,6 +1543,22 @@ export default function ManagerReviewsPage() {
           <button
             type="button"
             onClick={() => {
+              setListOverdueFirst(true);
+              void loadPendingReports({
+                page: 1,
+                pageSize: listPageSize,
+                keyword: listKeywordInput.trim(),
+                departmentId: listDepartmentId,
+                leaderUserId: listLeaderUserId,
+                overdueFirst: true
+              });
+            }}
+          >
+            只看逾期
+          </button>
+          <button
+            type="button"
+            onClick={() => {
               const nextKeyword = listKeywordInput.trim();
               const parsedDepartmentId = Number(listDepartmentIdInput.trim());
               const nextDepartmentId =
@@ -1625,12 +1643,7 @@ export default function ManagerReviewsPage() {
             {items.map((item) => (
               <li
                 key={item.id}
-                style={{
-                  background: "var(--surface)",
-                  border: "1px solid var(--border)",
-                  borderRadius: "12px",
-                  padding: "14px"
-                }}
+                className={`review-item-card${item.isOverdue ? " is-overdue" : ""}`}
               >
                 <label style={{ display: "flex", gap: "8px", alignItems: "center" }}>
                   <input
@@ -1649,8 +1662,18 @@ export default function ManagerReviewsPage() {
                   {item.user?.leader?.realName || item.user?.leader?.username || "未设置"}
                 </div>
                 {item.isOverdue ? (
-                  <div style={{ color: "#b45309", marginTop: "4px", fontSize: "12px" }}>
+                  <div className="review-item-overdue">
                     已逾期（应提时间：{item.dueAt ? new Date(item.dueAt).toLocaleString("zh-CN") : "未知"}）
+                  </div>
+                ) : null}
+                {item.risksText?.trim() ? (
+                  <div className="review-item-risk">
+                    风险提示：{item.risksText.trim()}
+                  </div>
+                ) : null}
+                {item.needsHelpText?.trim() ? (
+                  <div className="review-item-help">
+                    协助诉求：{item.needsHelpText.trim()}
                   </div>
                 ) : null}
                 <div style={{ display: "flex", gap: "8px", marginTop: "10px" }}>

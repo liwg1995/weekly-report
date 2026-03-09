@@ -10,6 +10,8 @@ type ReviewItem = {
   id: number;
   thisWeekText: string;
   status: string;
+  dueAt?: string;
+  isOverdue?: boolean;
   user?: {
     id: number;
     username: string;
@@ -210,6 +212,11 @@ export default function ManagerReviewsPage() {
   const [listPageSize, setListPageSize] = useState(20);
   const [listKeywordInput, setListKeywordInput] = useState("");
   const [listKeyword, setListKeyword] = useState("");
+  const [listDepartmentIdInput, setListDepartmentIdInput] = useState("");
+  const [listDepartmentId, setListDepartmentId] = useState<number | undefined>(undefined);
+  const [listLeaderUserIdInput, setListLeaderUserIdInput] = useState("");
+  const [listLeaderUserId, setListLeaderUserId] = useState<number | undefined>(undefined);
+  const [listOverdueFirst, setListOverdueFirst] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
@@ -361,20 +368,41 @@ export default function ManagerReviewsPage() {
       page?: number;
       pageSize?: number;
       keyword?: string;
+      departmentId?: number;
+      leaderUserId?: number;
+      overdueFirst?: boolean;
     }
   ) => {
     const nextPage = query?.page ?? listPage;
     const nextPageSize = query?.pageSize ?? listPageSize;
     const nextKeyword = (query?.keyword ?? listKeyword).trim();
+    const nextDepartmentId = query?.departmentId ?? listDepartmentId;
+    const nextLeaderUserId = query?.leaderUserId ?? listLeaderUserId;
+    const nextOverdueFirst = query?.overdueFirst ?? listOverdueFirst;
     const params = new URLSearchParams();
     params.set("status", "PENDING_APPROVAL");
-    const useLegacyDefaultQuery = nextPage === 1 && nextPageSize === 20 && !nextKeyword;
+    const useLegacyDefaultQuery =
+      nextPage === 1 &&
+      nextPageSize === 20 &&
+      !nextKeyword &&
+      !nextDepartmentId &&
+      !nextLeaderUserId &&
+      !nextOverdueFirst;
     if (!useLegacyDefaultQuery) {
       params.set("page", String(nextPage));
       params.set("pageSize", String(nextPageSize));
     }
     if (nextKeyword) {
       params.set("keyword", nextKeyword);
+    }
+    if (nextDepartmentId) {
+      params.set("departmentId", String(nextDepartmentId));
+    }
+    if (nextLeaderUserId) {
+      params.set("leaderUserId", String(nextLeaderUserId));
+    }
+    if (nextOverdueFirst) {
+      params.set("overdueFirst", "true");
     }
 
     try {
@@ -495,9 +523,24 @@ export default function ManagerReviewsPage() {
           })
         )
       );
-      setItems((prev) => prev.filter((item) => !reportIds.includes(item.id)));
-      setTotalItems((prev) => Math.max(0, prev - reportIds.length));
-      setSelectedIds((prev) => prev.filter((id) => !reportIds.includes(id)));
+      const refreshed = await loadPendingReports({
+        page: listPage,
+        pageSize: listPageSize,
+        keyword: listKeyword,
+        departmentId: listDepartmentId,
+        leaderUserId: listLeaderUserId,
+        overdueFirst: listOverdueFirst
+      });
+      if (refreshed && refreshed.items.length === 0 && listPage > 1) {
+        await loadPendingReports({
+          page: listPage - 1,
+          pageSize: listPageSize,
+          keyword: listKeyword,
+          departmentId: listDepartmentId,
+          leaderUserId: listLeaderUserId,
+          overdueFirst: listOverdueFirst
+        });
+      }
       setNotice(
         decision === "APPROVED"
           ? `已通过 ${reportIds.length} 条周报`
@@ -1461,7 +1504,10 @@ export default function ManagerReviewsPage() {
               void loadPendingReports({
                 page: 1,
                 pageSize: nextSize,
-                keyword: listKeywordInput.trim()
+                keyword: listKeywordInput.trim(),
+                departmentId: listDepartmentId,
+                leaderUserId: listLeaderUserId,
+                overdueFirst: listOverdueFirst
               });
             }}
           >
@@ -1469,12 +1515,54 @@ export default function ManagerReviewsPage() {
             <option value="20">20条/页</option>
             <option value="50">50条/页</option>
           </select>
+          <input
+            aria-label="部门ID筛选"
+            placeholder="部门ID"
+            value={listDepartmentIdInput}
+            onChange={(event) => setListDepartmentIdInput(event.target.value)}
+            style={{ width: "96px" }}
+          />
+          <input
+            aria-label="直属领导ID筛选"
+            placeholder="直属领导ID"
+            value={listLeaderUserIdInput}
+            onChange={(event) => setListLeaderUserIdInput(event.target.value)}
+            style={{ width: "120px" }}
+          />
+          <label>
+            <input
+              type="checkbox"
+              aria-label="逾期优先"
+              checked={listOverdueFirst}
+              onChange={(event) => setListOverdueFirst(event.target.checked)}
+            />{" "}
+            逾期优先
+          </label>
           <button
             type="button"
             onClick={() => {
               const nextKeyword = listKeywordInput.trim();
+              const parsedDepartmentId = Number(listDepartmentIdInput.trim());
+              const nextDepartmentId =
+                listDepartmentIdInput.trim() && !Number.isNaN(parsedDepartmentId)
+                  ? parsedDepartmentId
+                  : undefined;
+              const parsedLeaderUserId = Number(listLeaderUserIdInput.trim());
+              const nextLeaderUserId =
+                listLeaderUserIdInput.trim() && !Number.isNaN(parsedLeaderUserId)
+                  ? parsedLeaderUserId
+                  : undefined;
               setListKeyword(nextKeyword);
-              void loadPendingReports({ page: 1, pageSize: listPageSize, keyword: nextKeyword });
+              setListDepartmentId(nextDepartmentId);
+              setListLeaderUserId(nextLeaderUserId);
+              void loadPendingReports({
+                page: 1,
+                pageSize: listPageSize,
+                keyword: nextKeyword,
+                departmentId: nextDepartmentId,
+                leaderUserId: nextLeaderUserId,
+                overdueFirst: listOverdueFirst
+              });
             }}
           >
             查询
@@ -1484,7 +1572,19 @@ export default function ManagerReviewsPage() {
             onClick={() => {
               setListKeywordInput("");
               setListKeyword("");
-              void loadPendingReports({ page: 1, pageSize: listPageSize, keyword: "" });
+              setListDepartmentIdInput("");
+              setListDepartmentId(undefined);
+              setListLeaderUserIdInput("");
+              setListLeaderUserId(undefined);
+              setListOverdueFirst(false);
+              void loadPendingReports({
+                page: 1,
+                pageSize: listPageSize,
+                keyword: "",
+                departmentId: undefined,
+                leaderUserId: undefined,
+                overdueFirst: false
+              });
             }}
           >
             重置
@@ -1548,6 +1648,11 @@ export default function ManagerReviewsPage() {
                   员工: {item.user?.realName || "-"}（{item.user?.username || "-"}） | 直属领导:{" "}
                   {item.user?.leader?.realName || item.user?.leader?.username || "未设置"}
                 </div>
+                {item.isOverdue ? (
+                  <div style={{ color: "#b45309", marginTop: "4px", fontSize: "12px" }}>
+                    已逾期（应提时间：{item.dueAt ? new Date(item.dueAt).toLocaleString("zh-CN") : "未知"}）
+                  </div>
+                ) : null}
                 <div style={{ display: "flex", gap: "8px", marginTop: "10px" }}>
                   <button type="button" onClick={() => void reviewMany([item.id], "APPROVED")}>
                     通过
@@ -1573,7 +1678,10 @@ export default function ManagerReviewsPage() {
                 void loadPendingReports({
                   page: Math.max(1, listPage - 1),
                   pageSize: listPageSize,
-                  keyword: listKeyword
+                  keyword: listKeyword,
+                  departmentId: listDepartmentId,
+                  leaderUserId: listLeaderUserId,
+                  overdueFirst: listOverdueFirst
                 })
               }
             >
@@ -1586,7 +1694,10 @@ export default function ManagerReviewsPage() {
                 void loadPendingReports({
                   page: Math.min(listTotalPages, listPage + 1),
                   pageSize: listPageSize,
-                  keyword: listKeyword
+                  keyword: listKeyword,
+                  departmentId: listDepartmentId,
+                  leaderUserId: listLeaderUserId,
+                  overdueFirst: listOverdueFirst
                 })
               }
             >

@@ -60,6 +60,16 @@ describe("ManagerReviewsPage", () => {
         ok: true,
         status: 200,
         json: async () => ({
+          items: [],
+          total: 0,
+          page: 1,
+          pageSize: 20
+        })
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => ({
           items: [
             {
               id: 999,
@@ -226,6 +236,16 @@ describe("ManagerReviewsPage", () => {
         ok: true,
         status: 201,
         json: async () => ({ ok: true })
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => ({
+          items: [],
+          total: 0,
+          page: 1,
+          pageSize: 20
+        })
       })
       .mockResolvedValueOnce({
         ok: true,

@@ -177,4 +177,91 @@ describe("Reports (e2e)", () => {
       .send({ decision: "APPROVED", comment: "非直属不应通过" })
       .expect(403);
   });
+
+  it("can filter pending list by department and leader", async () => {
+    const suffix = `${Date.now()}_f`;
+    const leader = await request(app.getHttpServer())
+      .post("/users")
+      .set("Authorization", `Bearer ${token}`)
+      .send({ username: `leader_filter_${suffix}`, realName: "Leader Filter" })
+      .expect(201);
+    const empA = await request(app.getHttpServer())
+      .post("/users")
+      .set("Authorization", `Bearer ${token}`)
+      .send({ username: `empA_${suffix}`, realName: "Emp A" })
+      .expect(201);
+    const empB = await request(app.getHttpServer())
+      .post("/users")
+      .set("Authorization", `Bearer ${token}`)
+      .send({ username: `empB_${suffix}`, realName: "Emp B" })
+      .expect(201);
+    const dept = await request(app.getHttpServer())
+      .post("/departments")
+      .set("Authorization", `Bearer ${token}`)
+      .send({ name: `FilterDept-${suffix}`, reportDueWeekday: 5 })
+      .expect(201);
+
+    await request(app.getHttpServer())
+      .patch(`/users/${empA.body.id}/leader`)
+      .set("Authorization", `Bearer ${token}`)
+      .send({ leaderUserId: leader.body.id })
+      .expect(200);
+    await request(app.getHttpServer())
+      .post(`/users/${empA.body.id}/departments`)
+      .set("Authorization", `Bearer ${token}`)
+      .send({ departmentId: dept.body.id, roleInDept: "member", isPrimary: true })
+      .expect(201);
+
+    const empAToken = (
+      await request(app.getHttpServer())
+        .post("/auth/login")
+        .send({ username: `empA_${suffix}`, password: "123456" })
+        .expect(201)
+    ).body.accessToken as string;
+    const empBToken = (
+      await request(app.getHttpServer())
+        .post("/auth/login")
+        .send({ username: `empB_${suffix}`, password: "123456" })
+        .expect(201)
+    ).body.accessToken as string;
+
+    const reportA = await request(app.getHttpServer())
+      .post("/weekly-reports")
+      .set("Authorization", `Bearer ${empAToken}`)
+      .send({
+        cycleId: 10,
+        thisWeekText: "department match",
+        nextWeekText: "next",
+        risksText: "",
+        needsHelpText: ""
+      })
+      .expect(201);
+    const reportB = await request(app.getHttpServer())
+      .post("/weekly-reports")
+      .set("Authorization", `Bearer ${empBToken}`)
+      .send({
+        cycleId: 11,
+        thisWeekText: "department miss",
+        nextWeekText: "next",
+        risksText: "",
+        needsHelpText: ""
+      })
+      .expect(201);
+
+    const byDept = await request(app.getHttpServer())
+      .get(`/weekly-reports?status=PENDING_APPROVAL&departmentId=${dept.body.id}`)
+      .set("Authorization", `Bearer ${token}`)
+      .expect(200);
+    const deptIds = byDept.body.items.map((item: { id: number }) => item.id);
+    expect(deptIds).toContain(reportA.body.id);
+    expect(deptIds).not.toContain(reportB.body.id);
+
+    const byLeader = await request(app.getHttpServer())
+      .get(`/weekly-reports?status=PENDING_APPROVAL&leaderUserId=${leader.body.id}`)
+      .set("Authorization", `Bearer ${token}`)
+      .expect(200);
+    const leaderIds = byLeader.body.items.map((item: { id: number }) => item.id);
+    expect(leaderIds).toContain(reportA.body.id);
+    expect(leaderIds).not.toContain(reportB.body.id);
+  });
 });

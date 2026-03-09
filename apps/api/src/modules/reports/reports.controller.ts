@@ -45,14 +45,25 @@ export class ReportsController {
     @Query("status") status?: string,
     @Query("page") page?: string,
     @Query("pageSize") pageSize?: string,
-    @Query("keyword") keyword?: string
+    @Query("keyword") keyword?: string,
+    @Query("departmentId") departmentId?: string,
+    @Query("leaderUserId") leaderUserId?: string,
+    @Query("overdueFirst") overdueFirst?: string
   ) {
     return this.reportsService.list((request as UserRequest).user, {
       status,
       page: page ? Number(page) : undefined,
       pageSize: pageSize ? Number(pageSize) : undefined,
-      keyword
+      keyword,
+      departmentId: departmentId ? Number(departmentId) : undefined,
+      leaderUserId: leaderUserId ? Number(leaderUserId) : undefined,
+      overdueFirst: overdueFirst === "true"
     });
+  }
+
+  @Get("filter-options")
+  filterOptions(@Req() request: Request, @Query("status") status?: string) {
+    return this.reportsService.filterOptions((request as UserRequest).user, status);
   }
 
   @Get("mine/feedback")

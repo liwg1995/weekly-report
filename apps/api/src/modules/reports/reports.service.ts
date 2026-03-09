@@ -7,6 +7,65 @@ import { AuthUser } from "../auth/auth.service";
 export class ReportsService {
   constructor(private readonly prisma: PrismaService) {}
 
+  private async buildRoleWheres(user: AuthUser): Promise<Prisma.WeeklyReportWhereInput[]> {
+    const roleWheres: Prisma.WeeklyReportWhereInput[] = [];
+    if (user.roles.includes("SUPER_ADMIN")) {
+      roleWheres.push({});
+    }
+
+    if (user.roles.includes("MANAGER")) {
+      const managedDepts = await this.prisma.department.findMany({
+        where: { managerUserId: user.id },
+        select: { id: true }
+      });
+      const deptIds = managedDepts.map((item) => item.id);
+      if (deptIds.length > 0) {
+        roleWheres.push({
+          user: {
+            userDepartments: {
+              some: {
+                departmentId: { in: deptIds }
+              }
+            }
+          }
+        });
+      }
+    }
+
+    if (user.roles.includes("DEPT_ADMIN")) {
+      const adminDepts = await this.prisma.userDepartment.findMany({
+        where: {
+          userId: user.id,
+          roleInDept: "admin"
+        },
+        select: { departmentId: true }
+      });
+      const deptIds = adminDepts.map((item) => item.departmentId);
+      if (deptIds.length > 0) {
+        roleWheres.push({
+          user: {
+            userDepartments: {
+              some: {
+                departmentId: { in: deptIds }
+              }
+            }
+          }
+        });
+      }
+    }
+
+    if (user.roles.includes("LEADER")) {
+      roleWheres.push({
+        user: { leaderUserId: user.id }
+      });
+    }
+
+    if (user.roles.includes("EMPLOYEE")) {
+      roleWheres.push({ userId: user.id });
+    }
+    return roleWheres;
+  }
+
   private async ensureCycle(cycleId: number) {
     const existing = await this.prisma.reportCycle.findUnique({
       where: { id: cycleId }
@@ -102,71 +161,40 @@ export class ReportsService {
 
   async list(
     user: AuthUser,
-    query?: { status?: string; page?: number; pageSize?: number; keyword?: string }
+    query?: {
+      status?: string;
+      page?: number;
+      pageSize?: number;
+      keyword?: string;
+      departmentId?: number;
+      leaderUserId?: number;
+      overdueFirst?: boolean;
+    }
   ) {
     const page = Math.max(1, query?.page ?? 1);
     const pageSize = Math.min(100, Math.max(1, query?.pageSize ?? 20));
     const keyword = query?.keyword?.trim();
     const status = query?.status;
-
-    const roleWheres: Prisma.WeeklyReportWhereInput[] = [];
-    if (user.roles.includes("SUPER_ADMIN")) {
-      roleWheres.push({});
-    }
-
-    if (user.roles.includes("MANAGER")) {
-      const managedDepts = await this.prisma.department.findMany({
-        where: { managerUserId: user.id },
-        select: { id: true }
-      });
-      const deptIds = managedDepts.map((item) => item.id);
-      if (deptIds.length > 0) {
-        roleWheres.push({
-          user: {
-            userDepartments: {
-              some: {
-                departmentId: { in: deptIds }
-              }
-            }
-          }
-        });
-      }
-    }
-
-    if (user.roles.includes("DEPT_ADMIN")) {
-      const adminDepts = await this.prisma.userDepartment.findMany({
-        where: {
-          userId: user.id,
-          roleInDept: "admin"
-        },
-        select: { departmentId: true }
-      });
-      const deptIds = adminDepts.map((item) => item.departmentId);
-      if (deptIds.length > 0) {
-        roleWheres.push({
-          user: {
-            userDepartments: {
-              some: {
-                departmentId: { in: deptIds }
-              }
-            }
-          }
-        });
-      }
-    }
-
-    if (user.roles.includes("LEADER")) {
-      roleWheres.push({
-        user: { leaderUserId: user.id }
-      });
-    }
-
-    if (user.roles.includes("EMPLOYEE")) {
-      roleWheres.push({ userId: user.id });
-    }
+    const roleWheres = await this.buildRoleWheres(user);
 
     const where: Prisma.WeeklyReportWhereInput = {
       ...(status ? { status: status as ReportStatus } : {}),
+      ...(query?.departmentId
+        ? {
+            user: {
+              userDepartments: {
+                some: { departmentId: query.departmentId }
+              }
+            }
+          }
+        : {}),
+      ...(query?.leaderUserId
+        ? {
+            user: {
+              leaderUserId: query.leaderUserId
+            }
+          }
+        : {}),
       ...(keyword
         ? {
             OR: [
@@ -186,10 +214,17 @@ export class ReportsService {
       this.prisma.weeklyReport.count({ where }),
       this.prisma.weeklyReport.findMany({
         where,
-        orderBy: { id: "desc" },
+        orderBy: query?.overdueFirst
+          ? [{ cycle: { dueAt: "asc" } }, { id: "desc" }]
+          : { id: "desc" },
         skip: (page - 1) * pageSize,
         take: pageSize,
         include: {
+          cycle: {
+            select: {
+              dueAt: true
+            }
+          },
           user: {
             select: {
               id: true,
@@ -209,7 +244,65 @@ export class ReportsService {
       })
     ]);
 
-    return { items, total, page, pageSize };
+    const nowTs = Date.now();
+    return {
+      items: items.map((item) => ({
+        ...item,
+        isOverdue:
+          item.status === ReportStatus.PENDING_APPROVAL &&
+          item.cycle.dueAt.getTime() < nowTs
+      })),
+      total,
+      page,
+      pageSize
+    };
+  }
+
+  async filterOptions(user: AuthUser, status?: string) {
+    const roleWheres = await this.buildRoleWheres(user);
+    const scopedReports = await this.prisma.weeklyReport.findMany({
+      where: {
+        ...(status ? { status: status as ReportStatus } : {}),
+        ...(roleWheres.length > 0 ? { AND: [{ OR: roleWheres }] } : {})
+      },
+      select: {
+        user: {
+          select: {
+            leader: {
+              select: { id: true, username: true, realName: true }
+            },
+            userDepartments: {
+              select: {
+                department: {
+                  select: { id: true, name: true }
+                }
+              }
+            }
+          }
+        }
+      },
+      take: 1000
+    });
+
+    const leaderMap = new Map<number, { id: number; username: string; realName: string }>();
+    const deptMap = new Map<number, { id: number; name: string }>();
+    for (const report of scopedReports) {
+      if (report.user.leader) {
+        leaderMap.set(report.user.leader.id, report.user.leader);
+      }
+      for (const rel of report.user.userDepartments) {
+        deptMap.set(rel.department.id, rel.department);
+      }
+    }
+
+    return {
+      leaders: [...leaderMap.values()].sort((a, b) =>
+        `${a.realName}${a.username}`.localeCompare(`${b.realName}${b.username}`, "zh-CN")
+      ),
+      departments: [...deptMap.values()].sort((a, b) =>
+        a.name.localeCompare(b.name, "zh-CN")
+      )
+    };
   }
 
   async myFeedback(userId: number) {

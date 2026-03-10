@@ -342,4 +342,128 @@ describe("EmployeeFeedbackPage", () => {
       expect(screen.getByText("你有 1 条周报被驳回，待修改后重新提交。")).toBeInTheDocument();
     });
   });
+
+  it("submits weekly report from employee page", async () => {
+    const fetchMock = jest
+      .fn()
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => ({ items: [] })
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 201,
+        json: async () => ({ id: 3001, status: "PENDING_APPROVAL" })
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => ({ items: [] })
+      });
+    globalThis.fetch = fetchMock as typeof fetch;
+
+    render(<EmployeeFeedbackPage />);
+
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: "提交周报" })).toBeInTheDocument();
+    });
+
+    fireEvent.change(screen.getByLabelText("本周工作"), {
+      target: { value: "完成审批优化" }
+    });
+    fireEvent.change(screen.getByLabelText("下周计划"), {
+      target: { value: "推进组织管理细化" }
+    });
+    fireEvent.change(screen.getByLabelText("风险与阻塞"), {
+      target: { value: "暂无" }
+    });
+    fireEvent.change(screen.getByLabelText("需协助事项"), {
+      target: { value: "请协助联调" }
+    });
+    fireEvent.click(screen.getByRole("button", { name: "提交周报" }));
+
+    await waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledWith(
+        "/api/weekly-reports",
+        expect.objectContaining({
+          method: "POST",
+          body: expect.stringContaining("完成审批优化")
+        })
+      );
+      expect(screen.getByText("周报已提交，等待直属主管审批。")).toBeInTheDocument();
+    });
+  });
+
+  it("resubmits rejected report from feedback card", async () => {
+    const fetchMock = jest
+      .fn()
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => ({
+          items: [
+            {
+              reportId: 77,
+              latestDecision: "REJECTED",
+              latestComment: "请补充里程碑",
+              status: "REJECTED",
+              thisWeekText: "内容",
+              latestReviewedAt: "2026-03-08T10:00:00.000Z"
+            }
+          ]
+        })
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => ({ items: [] })
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => ({ id: 77, status: "PENDING_APPROVAL" })
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => ({
+          items: [
+            {
+              reportId: 77,
+              latestDecision: "REJECTED",
+              latestComment: "请补充里程碑",
+              status: "REJECTED",
+              thisWeekText: "内容",
+              latestReviewedAt: "2026-03-08T10:00:00.000Z"
+            }
+          ]
+        })
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => ({ items: [] })
+      });
+    globalThis.fetch = fetchMock as typeof fetch;
+
+    render(<EmployeeFeedbackPage />);
+
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: "重新提交" })).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "重新提交" }));
+
+    await waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledWith(
+        "/api/weekly-reports/77",
+        expect.objectContaining({
+          method: "PATCH",
+          body: JSON.stringify({ action: "resubmit" })
+        })
+      );
+      expect(screen.getByText("周报 #77 已重新提交。")).toBeInTheDocument();
+    });
+  });
 });

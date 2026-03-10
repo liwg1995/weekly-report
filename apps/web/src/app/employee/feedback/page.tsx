@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { ApiClientError, apiGet } from "../../../lib/api-client";
+import { ApiClientError, apiGet, apiPatch, apiPost } from "../../../lib/api-client";
 import { logoutWithConfirm, requireRole } from "../../../lib/auth-session";
 import SessionExpiryNotice from "../../../components/session-expiry-notice";
 
@@ -28,6 +28,16 @@ export default function EmployeeFeedbackPage() {
   const [selectedReportId, setSelectedReportId] = useState<number | null>(null);
   const [filter, setFilter] = useState<"all" | "REJECTED" | "APPROVED">("all");
   const [sortOrder, setSortOrder] = useState<"desc" | "asc">("desc");
+  const [cycleIdInput, setCycleIdInput] = useState(() =>
+    Number(new Date().toISOString().slice(0, 10).replace(/-/g, ""))
+  );
+  const [thisWeekText, setThisWeekText] = useState("");
+  const [nextWeekText, setNextWeekText] = useState("");
+  const [risksText, setRisksText] = useState("");
+  const [needsHelpText, setNeedsHelpText] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const [resubmittingId, setResubmittingId] = useState<number | null>(null);
+  const [notice, setNotice] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
   const [expandedIds, setExpandedIds] = useState<number[]>([]);
@@ -47,6 +57,71 @@ export default function EmployeeFeedbackPage() {
     setSelectedReportId(reportId);
     setTimeline(timelineData.items);
     setExpandedIds([]);
+  };
+
+  const loadFeedback = async () => {
+    const feedbackData = await apiGet<{
+      items: FeedbackItem[];
+    }>("/api/weekly-reports/mine/feedback");
+    setItems(feedbackData.items);
+    if (feedbackData.items.length > 0) {
+      await loadTimeline(feedbackData.items[0].reportId);
+    } else {
+      setSelectedReportId(null);
+      setTimeline([]);
+    }
+  };
+
+  const submitWeeklyReport = async () => {
+    if (!thisWeekText.trim() || !nextWeekText.trim()) {
+      setError("本周工作与下周计划不能为空。");
+      return;
+    }
+    setError("");
+    setNotice("");
+    setSubmitting(true);
+    try {
+      await apiPost("/api/weekly-reports", {
+        cycleId: Number(cycleIdInput),
+        thisWeekText: thisWeekText.trim(),
+        nextWeekText: nextWeekText.trim(),
+        risksText: risksText.trim(),
+        needsHelpText: needsHelpText.trim()
+      });
+      setNotice("周报已提交，等待直属主管审批。");
+      setThisWeekText("");
+      setNextWeekText("");
+      setRisksText("");
+      setNeedsHelpText("");
+      await loadFeedback();
+    } catch (submitError) {
+      if (submitError instanceof ApiClientError && submitError.status === 401) {
+        setError("登录已过期，请重新登录。");
+        return;
+      }
+      setError(submitError instanceof Error ? submitError.message : "提交失败，请稍后重试。");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const resubmitReport = async (reportId: number) => {
+    setError("");
+    setNotice("");
+    setResubmittingId(reportId);
+    try {
+      await apiPatch(`/api/weekly-reports/${reportId}`, { action: "resubmit" });
+      setNotice(`周报 #${reportId} 已重新提交。`);
+      await loadFeedback();
+    } catch (submitError) {
+      if (submitError instanceof ApiClientError && submitError.status === 401) {
+        setError("登录已过期，请重新登录。");
+        return;
+      }
+      setError(submitError instanceof Error ? submitError.message : "重提失败，请稍后重试。");
+    } finally {
+      setResubmittingId(null);
+    }
   };
 
   const toggleExpand = (id: number) => {
@@ -72,14 +147,7 @@ export default function EmployeeFeedbackPage() {
         return;
       }
       try {
-        const feedbackData = await apiGet<{
-          items: FeedbackItem[];
-        }>("/api/weekly-reports/mine/feedback");
-        setItems(feedbackData.items);
-
-        if (feedbackData.items.length > 0) {
-          await loadTimeline(feedbackData.items[0].reportId);
-        }
+        await loadFeedback();
       } catch (error) {
         if (error instanceof ApiClientError && error.status === 403) {
           setError("暂无查看反馈权限，请联系管理员。");
@@ -112,6 +180,55 @@ export default function EmployeeFeedbackPage() {
       <SessionExpiryNotice />
       {loading ? <p>加载中...</p> : null}
       {error ? <p style={{ color: "var(--danger)" }}>{error}</p> : null}
+      {notice ? <p style={{ color: "var(--primary-strong)" }}>{notice}</p> : null}
+
+      {!loading && !error ? (
+        <section
+          style={{
+            border: "1px solid var(--border)",
+            borderRadius: "12px",
+            padding: "14px",
+            marginBottom: "16px",
+            display: "grid",
+            gap: "8px"
+          }}
+        >
+          <h2 style={{ margin: 0, fontSize: "18px" }}>提交周报</h2>
+          <input
+            aria-label="周期ID"
+            type="number"
+            value={cycleIdInput}
+            onChange={(event) => setCycleIdInput(Number(event.target.value))}
+          />
+          <textarea
+            aria-label="本周工作"
+            placeholder="本周工作"
+            value={thisWeekText}
+            onChange={(event) => setThisWeekText(event.target.value)}
+          />
+          <textarea
+            aria-label="下周计划"
+            placeholder="下周计划"
+            value={nextWeekText}
+            onChange={(event) => setNextWeekText(event.target.value)}
+          />
+          <textarea
+            aria-label="风险与阻塞"
+            placeholder="风险与阻塞"
+            value={risksText}
+            onChange={(event) => setRisksText(event.target.value)}
+          />
+          <textarea
+            aria-label="需协助事项"
+            placeholder="需协助事项"
+            value={needsHelpText}
+            onChange={(event) => setNeedsHelpText(event.target.value)}
+          />
+          <button type="button" onClick={() => void submitWeeklyReport()} disabled={submitting}>
+            {submitting ? "提交中..." : "提交周报"}
+          </button>
+        </section>
+      ) : null}
       {!loading && !error && rejectedPendingCount > 0 ? (
         <section
           style={{
@@ -188,6 +305,17 @@ export default function EmployeeFeedbackPage() {
                       {formatTime(item.latestReviewedAt)}
                     </div>
                   </button>
+                  {item.status === "REJECTED" ? (
+                    <div style={{ marginTop: "8px" }}>
+                      <button
+                        type="button"
+                        onClick={() => void resubmitReport(item.reportId)}
+                        disabled={resubmittingId === item.reportId}
+                      >
+                        {resubmittingId === item.reportId ? "重提中..." : "重新提交"}
+                      </button>
+                    </div>
+                  ) : null}
                 </li>
               ))}
             </ul>

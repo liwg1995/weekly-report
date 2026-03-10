@@ -304,4 +304,37 @@ describe("Reports (e2e)", () => {
     expect(ids).toContain(withMention.body.id);
     expect(ids).not.toContain(withoutMention.body.id);
   });
+
+  it("returns mention fields in mine feedback list", async () => {
+    const created = await request(app.getHttpServer())
+      .post("/weekly-reports")
+      .set("Authorization", `Bearer ${token}`)
+      .send({
+        cycleId: 14,
+        thisWeekText: "feedback mention",
+        nextWeekText: "next",
+        risksText: "",
+        needsHelpText: "",
+        mentionLeader: true,
+        mentionComment: "@leader 需要查阅"
+      })
+      .expect(201);
+
+    await request(app.getHttpServer())
+      .post(`/weekly-reports/${created.body.id}/review`)
+      .set("Authorization", `Bearer ${token}`)
+      .send({ decision: "APPROVED", comment: "已阅" })
+      .expect(201);
+
+    const mine = await request(app.getHttpServer())
+      .get("/weekly-reports/mine/feedback")
+      .set("Authorization", `Bearer ${token}`)
+      .expect(200);
+
+    const target = mine.body.items.find((item: { reportId: number }) => item.reportId === created.body.id);
+    expect(target).toBeTruthy();
+    expect(target.mentionLeader).toBe(true);
+    expect(target.mentionComment).toBe("@leader 需要查阅");
+    expect(typeof target.submittedAt).toBe("string");
+  });
 });

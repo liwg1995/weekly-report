@@ -63,6 +63,42 @@ describe("EmployeeFeedbackPage", () => {
     });
   });
 
+  it("shows mention status and submit time on feedback card", async () => {
+    globalThis.fetch = jest
+      .fn()
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => ({
+          items: [
+            {
+              reportId: 88,
+              latestDecision: "APPROVED",
+              latestComment: "已通过",
+              status: "APPROVED",
+              thisWeekText: "x",
+              latestReviewedAt: "2026-03-10T10:00:00.000Z",
+              submittedAt: "2026-03-10T08:30:00.000Z",
+              mentionLeader: true,
+              mentionComment: "@leader 请查阅"
+            }
+          ]
+        })
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => ({ items: [] })
+      }) as typeof fetch;
+
+    render(<EmployeeFeedbackPage />);
+
+    await waitFor(() => {
+      expect(screen.getByText("已@直属领导：@leader 请查阅")).toBeInTheDocument();
+      expect(screen.getByText(/提交于/)).toBeInTheDocument();
+    });
+  });
+
   it("switches timeline when clicking another feedback item", async () => {
     globalThis.fetch = jest
       .fn()

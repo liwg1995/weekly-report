@@ -336,6 +336,9 @@ export class ReportsService {
             reportId: report.id,
             status: report.status,
             thisWeekText: report.thisWeekText,
+            submittedAt: report.submittedAt,
+            mentionLeader: report.mentionLeader,
+            mentionComment: report.mentionComment,
             latestDecision: latest.decision,
             latestComment: latest.comment,
             latestReviewedAt: latest.createdAt

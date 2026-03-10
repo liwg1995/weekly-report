@@ -9,6 +9,9 @@ type FeedbackItem = {
   reportId: number;
   status: string;
   thisWeekText: string;
+  submittedAt?: string;
+  mentionLeader?: boolean;
+  mentionComment?: string;
   latestDecision: string;
   latestComment: string;
   latestReviewedAt: string;
@@ -323,9 +326,19 @@ export default function EmployeeFeedbackPage() {
                       <strong>周报 #{item.reportId}</strong> · {item.latestDecision}
                     </div>
                     <div style={{ marginTop: "6px" }}>{item.latestComment}</div>
+                    {item.mentionLeader ? (
+                      <div style={{ marginTop: "4px", color: "var(--primary-strong)", fontSize: "12px" }}>
+                        已@直属领导：{item.mentionComment?.trim() || "请查阅"}
+                      </div>
+                    ) : null}
                     <div style={{ marginTop: "4px", color: "var(--muted)", fontSize: "12px" }}>
                       {formatTime(item.latestReviewedAt)}
                     </div>
+                    {item.submittedAt ? (
+                      <div style={{ marginTop: "2px", color: "var(--muted)", fontSize: "12px" }}>
+                        提交于：{formatTime(item.submittedAt)}
+                      </div>
+                    ) : null}
                   </button>
                   {item.status === "REJECTED" ? (
                     <div style={{ marginTop: "8px" }}>

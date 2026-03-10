@@ -337,4 +337,44 @@ describe("Reports (e2e)", () => {
     expect(target.mentionComment).toBe("@leader 需要查阅");
     expect(typeof target.submittedAt).toBe("string");
   });
+
+  it("can sort pending list by mention first", async () => {
+    const mentionFirst = await request(app.getHttpServer())
+      .post("/weekly-reports")
+      .set("Authorization", `Bearer ${token}`)
+      .send({
+        cycleId: 15,
+        thisWeekText: "mention first",
+        nextWeekText: "next",
+        risksText: "",
+        needsHelpText: "",
+        mentionLeader: true,
+        mentionComment: "@leader 优先"
+      })
+      .expect(201);
+    const normalLater = await request(app.getHttpServer())
+      .post("/weekly-reports")
+      .set("Authorization", `Bearer ${token}`)
+      .send({
+        cycleId: 16,
+        thisWeekText: "normal later",
+        nextWeekText: "next",
+        risksText: "",
+        needsHelpText: "",
+        mentionLeader: false
+      })
+      .expect(201);
+
+    const sorted = await request(app.getHttpServer())
+      .get("/weekly-reports?status=PENDING_APPROVAL&mentionFirst=true&page=1&pageSize=20")
+      .set("Authorization", `Bearer ${token}`)
+      .expect(200);
+
+    const ids = sorted.body.items.map((item: { id: number }) => item.id);
+    const mentionIndex = ids.indexOf(mentionFirst.body.id);
+    const normalIndex = ids.indexOf(normalLater.body.id);
+    expect(mentionIndex).toBeGreaterThanOrEqual(0);
+    expect(normalIndex).toBeGreaterThanOrEqual(0);
+    expect(mentionIndex).toBeLessThan(normalIndex);
+  });
 });

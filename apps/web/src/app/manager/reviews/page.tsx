@@ -260,6 +260,7 @@ export default function ManagerReviewsPage() {
   const [listLeaderUserId, setListLeaderUserId] = useState<number | undefined>(undefined);
   const [listOverdueFirst, setListOverdueFirst] = useState(false);
   const [listMentionLeaderOnly, setListMentionLeaderOnly] = useState(false);
+  const [listMentionFirst, setListMentionFirst] = useState(false);
   const [filterDepartments, setFilterDepartments] = useState<Array<{ id: number; name: string }>>(
     () => cachedFilterOptions.departments
   );
@@ -463,6 +464,7 @@ export default function ManagerReviewsPage() {
       leaderUserId?: number;
       overdueFirst?: boolean;
       mentionLeaderOnly?: boolean;
+      mentionFirst?: boolean;
     }
   ) => {
     const nextPage = query?.page ?? listPage;
@@ -472,6 +474,7 @@ export default function ManagerReviewsPage() {
     const nextLeaderUserId = query?.leaderUserId ?? listLeaderUserId;
     const nextOverdueFirst = query?.overdueFirst ?? listOverdueFirst;
     const nextMentionLeaderOnly = query?.mentionLeaderOnly ?? listMentionLeaderOnly;
+    const nextMentionFirst = query?.mentionFirst ?? listMentionFirst;
     const params = new URLSearchParams();
     params.set("status", "PENDING_APPROVAL");
     const useLegacyDefaultQuery =
@@ -481,7 +484,8 @@ export default function ManagerReviewsPage() {
       !nextDepartmentId &&
       !nextLeaderUserId &&
       !nextOverdueFirst &&
-      !nextMentionLeaderOnly;
+      !nextMentionLeaderOnly &&
+      !nextMentionFirst;
     if (!useLegacyDefaultQuery) {
       params.set("page", String(nextPage));
       params.set("pageSize", String(nextPageSize));
@@ -500,6 +504,9 @@ export default function ManagerReviewsPage() {
     }
     if (nextMentionLeaderOnly) {
       params.set("mentionLeaderOnly", "true");
+    }
+    if (nextMentionFirst) {
+      params.set("mentionFirst", "true");
     }
 
     try {
@@ -648,7 +655,8 @@ export default function ManagerReviewsPage() {
         keyword: listKeyword,
         departmentId: listDepartmentId,
         leaderUserId: listLeaderUserId,
-        overdueFirst: listOverdueFirst
+        overdueFirst: listOverdueFirst,
+        mentionFirst: listMentionFirst
       });
       if (refreshed && refreshed.items.length === 0 && listPage > 1) {
         await loadPendingReports({
@@ -657,7 +665,8 @@ export default function ManagerReviewsPage() {
           keyword: listKeyword,
           departmentId: listDepartmentId,
           leaderUserId: listLeaderUserId,
-          overdueFirst: listOverdueFirst
+          overdueFirst: listOverdueFirst,
+          mentionFirst: listMentionFirst
         });
       }
       setNotice(
@@ -1550,7 +1559,8 @@ export default function ManagerReviewsPage() {
     selectedDepartmentLabel ? `部门：${selectedDepartmentLabel}` : "",
     selectedLeader ? `直属领导：${selectedLeader.realName}（${selectedLeader.username}）` : "",
     listOverdueFirst ? "逾期优先" : "",
-    listMentionLeaderOnly ? "@领导提醒" : ""
+    listMentionLeaderOnly ? "@领导提醒" : "",
+    listMentionFirst ? "提醒优先排序" : ""
   ].filter(Boolean);
   const filterOptionsUpdatedAtText = filterOptionsFetchedAt
     ? new Date(filterOptionsFetchedAt).toLocaleString("zh-CN")
@@ -1728,6 +1738,15 @@ export default function ManagerReviewsPage() {
             />{" "}
             @领导提醒
           </label>
+          <label>
+            <input
+              type="checkbox"
+              aria-label="提醒优先"
+              checked={listMentionFirst}
+              onChange={(event) => setListMentionFirst(event.target.checked)}
+            />{" "}
+            提醒优先
+          </label>
           <button
             type="button"
             onClick={() => {
@@ -1739,7 +1758,8 @@ export default function ManagerReviewsPage() {
                 departmentId: listDepartmentId,
                 leaderUserId: listLeaderUserId,
                 overdueFirst: true,
-                mentionLeaderOnly: listMentionLeaderOnly
+                mentionLeaderOnly: listMentionLeaderOnly,
+                mentionFirst: listMentionFirst
               });
             }}
           >
@@ -1756,11 +1776,30 @@ export default function ManagerReviewsPage() {
                 departmentId: listDepartmentId,
                 leaderUserId: listLeaderUserId,
                 overdueFirst: listOverdueFirst,
-                mentionLeaderOnly: true
+                mentionLeaderOnly: true,
+                mentionFirst: listMentionFirst
               });
             }}
           >
             只看@领导提醒
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setListMentionFirst(true);
+              void loadPendingReports({
+                page: 1,
+                pageSize: listPageSize,
+                keyword: listKeywordInput.trim(),
+                departmentId: listDepartmentId,
+                leaderUserId: listLeaderUserId,
+                overdueFirst: listOverdueFirst,
+                mentionLeaderOnly: listMentionLeaderOnly,
+                mentionFirst: true
+              });
+            }}
+          >
+            提醒优先排序
           </button>
           <button
             type="button"
@@ -1774,7 +1813,8 @@ export default function ManagerReviewsPage() {
                 departmentId: listDepartmentId,
                 leaderUserId: listLeaderUserId,
                 overdueFirst: listOverdueFirst,
-                mentionLeaderOnly: listMentionLeaderOnly
+                mentionLeaderOnly: listMentionLeaderOnly,
+                mentionFirst: listMentionFirst
               });
             }}
           >
@@ -1789,6 +1829,7 @@ export default function ManagerReviewsPage() {
               setListLeaderUserId(undefined);
               setListOverdueFirst(false);
               setListMentionLeaderOnly(false);
+              setListMentionFirst(false);
               void loadPendingReports({
                 page: 1,
                 pageSize: listPageSize,
@@ -1796,7 +1837,8 @@ export default function ManagerReviewsPage() {
                 departmentId: undefined,
                 leaderUserId: undefined,
                 overdueFirst: false,
-                mentionLeaderOnly: false
+                mentionLeaderOnly: false,
+                mentionFirst: false
               });
             }}
           >
@@ -1821,7 +1863,8 @@ export default function ManagerReviewsPage() {
                     keyword: "",
                     departmentId: listDepartmentId,
                     leaderUserId: listLeaderUserId,
-                    overdueFirst: listOverdueFirst
+                    overdueFirst: listOverdueFirst,
+                    mentionFirst: listMentionFirst
                   });
                 }}
               >
@@ -1840,7 +1883,8 @@ export default function ManagerReviewsPage() {
                     keyword: listKeyword,
                     departmentId: undefined,
                     leaderUserId: listLeaderUserId,
-                    overdueFirst: listOverdueFirst
+                    overdueFirst: listOverdueFirst,
+                    mentionFirst: listMentionFirst
                   });
                 }}
               >
@@ -1859,7 +1903,8 @@ export default function ManagerReviewsPage() {
                     keyword: listKeyword,
                     departmentId: listDepartmentId,
                     leaderUserId: undefined,
-                    overdueFirst: listOverdueFirst
+                    overdueFirst: listOverdueFirst,
+                    mentionFirst: listMentionFirst
                   });
                 }}
               >
@@ -1879,7 +1924,8 @@ export default function ManagerReviewsPage() {
                     departmentId: listDepartmentId,
                     leaderUserId: listLeaderUserId,
                     overdueFirst: false,
-                    mentionLeaderOnly: listMentionLeaderOnly
+                    mentionLeaderOnly: listMentionLeaderOnly,
+                    mentionFirst: listMentionFirst
                   });
                 }}
               >
@@ -1899,11 +1945,33 @@ export default function ManagerReviewsPage() {
                     departmentId: listDepartmentId,
                     leaderUserId: listLeaderUserId,
                     overdueFirst: listOverdueFirst,
-                    mentionLeaderOnly: false
+                    mentionLeaderOnly: false,
+                    mentionFirst: listMentionFirst
                   });
                 }}
               >
                 @领导提醒 ×
+              </button>
+            ) : null}
+            {listMentionFirst ? (
+              <button
+                type="button"
+                className="review-filter-tag"
+                onClick={() => {
+                  setListMentionFirst(false);
+                  void loadPendingReports({
+                    page: 1,
+                    pageSize: listPageSize,
+                    keyword: listKeyword,
+                    departmentId: listDepartmentId,
+                    leaderUserId: listLeaderUserId,
+                    overdueFirst: listOverdueFirst,
+                    mentionLeaderOnly: listMentionLeaderOnly,
+                    mentionFirst: false
+                  });
+                }}
+              >
+                提醒优先排序 ×
               </button>
             ) : null}
             <button
@@ -1916,6 +1984,7 @@ export default function ManagerReviewsPage() {
                 setListLeaderUserId(undefined);
                 setListOverdueFirst(false);
                 setListMentionLeaderOnly(false);
+                setListMentionFirst(false);
                 void loadPendingReports({
                   page: 1,
                   pageSize: listPageSize,
@@ -1923,7 +1992,8 @@ export default function ManagerReviewsPage() {
                   departmentId: undefined,
                   leaderUserId: undefined,
                   overdueFirst: false,
-                  mentionLeaderOnly: false
+                  mentionLeaderOnly: false,
+                  mentionFirst: false
                 });
               }}
             >
@@ -2029,7 +2099,8 @@ export default function ManagerReviewsPage() {
                   keyword: listKeyword,
                   departmentId: listDepartmentId,
                   leaderUserId: listLeaderUserId,
-                  overdueFirst: listOverdueFirst
+                  overdueFirst: listOverdueFirst,
+                  mentionFirst: listMentionFirst
                 })
               }
             >
@@ -2045,7 +2116,8 @@ export default function ManagerReviewsPage() {
                   keyword: listKeyword,
                   departmentId: listDepartmentId,
                   leaderUserId: listLeaderUserId,
-                  overdueFirst: listOverdueFirst
+                  overdueFirst: listOverdueFirst,
+                  mentionFirst: listMentionFirst
                 })
               }
             >

@@ -51,7 +51,8 @@ export class ReportsController {
     @Query("departmentId") departmentId?: string,
     @Query("leaderUserId") leaderUserId?: string,
     @Query("overdueFirst") overdueFirst?: string,
-    @Query("mentionLeaderOnly") mentionLeaderOnly?: string
+    @Query("mentionLeaderOnly") mentionLeaderOnly?: string,
+    @Query("mentionFirst") mentionFirst?: string
   ) {
     return this.reportsService.list((request as UserRequest).user, {
       status,
@@ -61,7 +62,8 @@ export class ReportsController {
       departmentId: departmentId ? Number(departmentId) : undefined,
       leaderUserId: leaderUserId ? Number(leaderUserId) : undefined,
       overdueFirst: overdueFirst === "true",
-      mentionLeaderOnly: mentionLeaderOnly === "true"
+      mentionLeaderOnly: mentionLeaderOnly === "true",
+      mentionFirst: mentionFirst === "true"
     });
   }
 

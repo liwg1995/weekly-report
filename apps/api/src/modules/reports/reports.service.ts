@@ -174,6 +174,7 @@ export class ReportsService {
       leaderUserId?: number;
       overdueFirst?: boolean;
       mentionLeaderOnly?: boolean;
+      mentionFirst?: boolean;
     }
   ) {
     const page = Math.max(1, query?.page ?? 1);
@@ -220,13 +221,20 @@ export class ReportsService {
       ...(roleWheres.length > 0 ? { AND: [{ OR: roleWheres }] } : {})
     };
 
+    const orderBy: Prisma.WeeklyReportOrderByWithRelationInput[] = [];
+    if (query?.mentionFirst) {
+      orderBy.push({ mentionLeader: "desc" });
+    }
+    if (query?.overdueFirst) {
+      orderBy.push({ cycle: { dueAt: "asc" } });
+    }
+    orderBy.push({ id: "desc" });
+
     const [total, items] = await this.prisma.$transaction([
       this.prisma.weeklyReport.count({ where }),
       this.prisma.weeklyReport.findMany({
         where,
-        orderBy: query?.overdueFirst
-          ? [{ cycle: { dueAt: "asc" } }, { id: "desc" }]
-          : { id: "desc" },
+        orderBy,
         skip: (page - 1) * pageSize,
         take: pageSize,
         include: {

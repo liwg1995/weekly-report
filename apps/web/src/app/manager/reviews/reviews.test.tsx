@@ -709,6 +709,51 @@ describe("ManagerReviewsPage", () => {
     });
   });
 
+  it("supports mention-first sorting query", async () => {
+    const fetchMock = jest
+      .fn()
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => ({
+          items: [{ id: 957, thisWeekText: "提醒优先", status: "PENDING_APPROVAL" }],
+          total: 1,
+          page: 1,
+          pageSize: 20
+        })
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => ({ items: [] })
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => ({
+          items: [{ id: 957, thisWeekText: "提醒优先", status: "PENDING_APPROVAL" }],
+          total: 1,
+          page: 1,
+          pageSize: 20
+        })
+      });
+    globalThis.fetch = fetchMock as typeof fetch;
+
+    render(<ManagerReviewsPage />);
+    await waitFor(() => {
+      expect(screen.getByText("提醒优先")).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "提醒优先排序" }));
+
+    await waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledWith(
+        "/api/weekly-reports?status=PENDING_APPROVAL&page=1&pageSize=20&mentionFirst=true",
+        expect.objectContaining({ method: "GET" })
+      );
+    });
+  });
+
   it("loads filter options and supports active filter tags clear all", async () => {
     const fetchMock = jest
       .fn()

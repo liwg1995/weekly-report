@@ -21,6 +21,8 @@ export class ReportsController {
       nextWeekText: string;
       risksText: string;
       needsHelpText: string;
+      mentionLeader?: boolean;
+      mentionComment?: string;
     }
   ) {
     return this.reportsService.create((request as UserRequest).user.id, body);
@@ -48,7 +50,8 @@ export class ReportsController {
     @Query("keyword") keyword?: string,
     @Query("departmentId") departmentId?: string,
     @Query("leaderUserId") leaderUserId?: string,
-    @Query("overdueFirst") overdueFirst?: string
+    @Query("overdueFirst") overdueFirst?: string,
+    @Query("mentionLeaderOnly") mentionLeaderOnly?: string
   ) {
     return this.reportsService.list((request as UserRequest).user, {
       status,
@@ -57,7 +60,8 @@ export class ReportsController {
       keyword,
       departmentId: departmentId ? Number(departmentId) : undefined,
       leaderUserId: leaderUserId ? Number(leaderUserId) : undefined,
-      overdueFirst: overdueFirst === "true"
+      overdueFirst: overdueFirst === "true",
+      mentionLeaderOnly: mentionLeaderOnly === "true"
     });
   }
 

@@ -11,6 +11,8 @@ type ReviewItem = {
   thisWeekText: string;
   risksText?: string;
   needsHelpText?: string;
+  mentionLeader?: boolean;
+  mentionComment?: string;
   status: string;
   dueAt?: string;
   isOverdue?: boolean;
@@ -257,6 +259,7 @@ export default function ManagerReviewsPage() {
   const [listDepartmentId, setListDepartmentId] = useState<number | undefined>(undefined);
   const [listLeaderUserId, setListLeaderUserId] = useState<number | undefined>(undefined);
   const [listOverdueFirst, setListOverdueFirst] = useState(false);
+  const [listMentionLeaderOnly, setListMentionLeaderOnly] = useState(false);
   const [filterDepartments, setFilterDepartments] = useState<Array<{ id: number; name: string }>>(
     () => cachedFilterOptions.departments
   );
@@ -459,6 +462,7 @@ export default function ManagerReviewsPage() {
       departmentId?: number;
       leaderUserId?: number;
       overdueFirst?: boolean;
+      mentionLeaderOnly?: boolean;
     }
   ) => {
     const nextPage = query?.page ?? listPage;
@@ -467,6 +471,7 @@ export default function ManagerReviewsPage() {
     const nextDepartmentId = query?.departmentId ?? listDepartmentId;
     const nextLeaderUserId = query?.leaderUserId ?? listLeaderUserId;
     const nextOverdueFirst = query?.overdueFirst ?? listOverdueFirst;
+    const nextMentionLeaderOnly = query?.mentionLeaderOnly ?? listMentionLeaderOnly;
     const params = new URLSearchParams();
     params.set("status", "PENDING_APPROVAL");
     const useLegacyDefaultQuery =
@@ -475,7 +480,8 @@ export default function ManagerReviewsPage() {
       !nextKeyword &&
       !nextDepartmentId &&
       !nextLeaderUserId &&
-      !nextOverdueFirst;
+      !nextOverdueFirst &&
+      !nextMentionLeaderOnly;
     if (!useLegacyDefaultQuery) {
       params.set("page", String(nextPage));
       params.set("pageSize", String(nextPageSize));
@@ -491,6 +497,9 @@ export default function ManagerReviewsPage() {
     }
     if (nextOverdueFirst) {
       params.set("overdueFirst", "true");
+    }
+    if (nextMentionLeaderOnly) {
+      params.set("mentionLeaderOnly", "true");
     }
 
     try {
@@ -1540,7 +1549,8 @@ export default function ManagerReviewsPage() {
     listKeyword ? `关键词：${listKeyword}` : "",
     selectedDepartmentLabel ? `部门：${selectedDepartmentLabel}` : "",
     selectedLeader ? `直属领导：${selectedLeader.realName}（${selectedLeader.username}）` : "",
-    listOverdueFirst ? "逾期优先" : ""
+    listOverdueFirst ? "逾期优先" : "",
+    listMentionLeaderOnly ? "@领导提醒" : ""
   ].filter(Boolean);
   const filterOptionsUpdatedAtText = filterOptionsFetchedAt
     ? new Date(filterOptionsFetchedAt).toLocaleString("zh-CN")
@@ -1709,6 +1719,15 @@ export default function ManagerReviewsPage() {
             />{" "}
             逾期优先
           </label>
+          <label>
+            <input
+              type="checkbox"
+              aria-label="@领导提醒"
+              checked={listMentionLeaderOnly}
+              onChange={(event) => setListMentionLeaderOnly(event.target.checked)}
+            />{" "}
+            @领导提醒
+          </label>
           <button
             type="button"
             onClick={() => {
@@ -1719,11 +1738,29 @@ export default function ManagerReviewsPage() {
                 keyword: listKeywordInput.trim(),
                 departmentId: listDepartmentId,
                 leaderUserId: listLeaderUserId,
-                overdueFirst: true
+                overdueFirst: true,
+                mentionLeaderOnly: listMentionLeaderOnly
               });
             }}
           >
             只看逾期
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setListMentionLeaderOnly(true);
+              void loadPendingReports({
+                page: 1,
+                pageSize: listPageSize,
+                keyword: listKeywordInput.trim(),
+                departmentId: listDepartmentId,
+                leaderUserId: listLeaderUserId,
+                overdueFirst: listOverdueFirst,
+                mentionLeaderOnly: true
+              });
+            }}
+          >
+            只看@领导提醒
           </button>
           <button
             type="button"
@@ -1736,7 +1773,8 @@ export default function ManagerReviewsPage() {
                 keyword: nextKeyword,
                 departmentId: listDepartmentId,
                 leaderUserId: listLeaderUserId,
-                overdueFirst: listOverdueFirst
+                overdueFirst: listOverdueFirst,
+                mentionLeaderOnly: listMentionLeaderOnly
               });
             }}
           >
@@ -1750,13 +1788,15 @@ export default function ManagerReviewsPage() {
               setListDepartmentId(undefined);
               setListLeaderUserId(undefined);
               setListOverdueFirst(false);
+              setListMentionLeaderOnly(false);
               void loadPendingReports({
                 page: 1,
                 pageSize: listPageSize,
                 keyword: "",
                 departmentId: undefined,
                 leaderUserId: undefined,
-                overdueFirst: false
+                overdueFirst: false,
+                mentionLeaderOnly: false
               });
             }}
           >
@@ -1838,11 +1878,32 @@ export default function ManagerReviewsPage() {
                     keyword: listKeyword,
                     departmentId: listDepartmentId,
                     leaderUserId: listLeaderUserId,
-                    overdueFirst: false
+                    overdueFirst: false,
+                    mentionLeaderOnly: listMentionLeaderOnly
                   });
                 }}
               >
                 逾期优先 ×
+              </button>
+            ) : null}
+            {listMentionLeaderOnly ? (
+              <button
+                type="button"
+                className="review-filter-tag"
+                onClick={() => {
+                  setListMentionLeaderOnly(false);
+                  void loadPendingReports({
+                    page: 1,
+                    pageSize: listPageSize,
+                    keyword: listKeyword,
+                    departmentId: listDepartmentId,
+                    leaderUserId: listLeaderUserId,
+                    overdueFirst: listOverdueFirst,
+                    mentionLeaderOnly: false
+                  });
+                }}
+              >
+                @领导提醒 ×
               </button>
             ) : null}
             <button
@@ -1854,13 +1915,15 @@ export default function ManagerReviewsPage() {
                 setListDepartmentId(undefined);
                 setListLeaderUserId(undefined);
                 setListOverdueFirst(false);
+                setListMentionLeaderOnly(false);
                 void loadPendingReports({
                   page: 1,
                   pageSize: listPageSize,
                   keyword: "",
                   departmentId: undefined,
                   leaderUserId: undefined,
-                  overdueFirst: false
+                  overdueFirst: false,
+                  mentionLeaderOnly: false
                 });
               }}
             >
@@ -1931,6 +1994,11 @@ export default function ManagerReviewsPage() {
                 {item.needsHelpText?.trim() ? (
                   <div className="review-item-help">
                     协助诉求：{item.needsHelpText.trim()}
+                  </div>
+                ) : null}
+                {item.mentionLeader ? (
+                  <div className="review-item-help">
+                    @领导提醒{item.mentionComment?.trim() ? `：${item.mentionComment.trim()}` : ""}
                   </div>
                 ) : null}
                 <div style={{ display: "flex", gap: "8px", marginTop: "10px" }}>

@@ -108,6 +108,8 @@ model WeeklyReport {
   nextWeekText  String         @map("next_week_text")
   risksText     String         @default("") @map("risks_text")
   needsHelpText String         @default("") @map("needs_help_text")
+  mentionLeader Boolean        @default(false) @map("mention_leader")
+  mentionComment String        @default("") @map("mention_comment") @db.VarChar(255)
   submittedAt   DateTime?      @map("submitted_at")
   approvedAt    DateTime?      @map("approved_at")
   rejectedAt    DateTime?      @map("rejected_at")

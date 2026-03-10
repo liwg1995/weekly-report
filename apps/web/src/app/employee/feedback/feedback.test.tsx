@@ -381,6 +381,10 @@ describe("EmployeeFeedbackPage", () => {
     fireEvent.change(screen.getByLabelText("需协助事项"), {
       target: { value: "请协助联调" }
     });
+    fireEvent.click(screen.getByLabelText("@直属领导提醒"));
+    fireEvent.change(screen.getByLabelText("@提醒备注"), {
+      target: { value: "@leader 本条需要优先看" }
+    });
     fireEvent.click(screen.getByRole("button", { name: "提交周报" }));
 
     await waitFor(() => {
@@ -388,7 +392,7 @@ describe("EmployeeFeedbackPage", () => {
         "/api/weekly-reports",
         expect.objectContaining({
           method: "POST",
-          body: expect.stringContaining("完成审批优化")
+          body: expect.stringContaining("\"mentionLeader\":true")
         })
       );
       expect(screen.getByText("周报已提交，等待直属主管审批。")).toBeInTheDocument();

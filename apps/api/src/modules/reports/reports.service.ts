@@ -107,6 +107,8 @@ export class ReportsService {
       nextWeekText: string;
       risksText: string;
       needsHelpText: string;
+      mentionLeader?: boolean;
+      mentionComment?: string;
     }
   ) {
     await this.ensureCycle(input.cycleId);
@@ -119,6 +121,8 @@ export class ReportsService {
         nextWeekText: input.nextWeekText,
         risksText: input.risksText,
         needsHelpText: input.needsHelpText,
+        mentionLeader: Boolean(input.mentionLeader),
+        mentionComment: input.mentionComment?.trim() ?? "",
         submittedAt: new Date()
       }
     });
@@ -169,6 +173,7 @@ export class ReportsService {
       departmentId?: number;
       leaderUserId?: number;
       overdueFirst?: boolean;
+      mentionLeaderOnly?: boolean;
     }
   ) {
     const page = Math.max(1, query?.page ?? 1);
@@ -193,6 +198,11 @@ export class ReportsService {
             user: {
               leaderUserId: query.leaderUserId
             }
+          }
+        : {}),
+      ...(query?.mentionLeaderOnly
+        ? {
+            mentionLeader: true
           }
         : {}),
       ...(keyword

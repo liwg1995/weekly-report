@@ -647,6 +647,68 @@ describe("ManagerReviewsPage", () => {
     });
   });
 
+  it("shows mention badge and supports mention-only filter", async () => {
+    const fetchMock = jest
+      .fn()
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => ({
+          items: [
+            {
+              id: 956,
+              thisWeekText: "需要主管关注",
+              status: "PENDING_APPROVAL",
+              mentionLeader: true,
+              mentionComment: "请今天内确认方案"
+            }
+          ],
+          total: 1,
+          page: 1,
+          pageSize: 20
+        })
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => ({ items: [] })
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => ({
+          items: [
+            {
+              id: 956,
+              thisWeekText: "需要主管关注",
+              status: "PENDING_APPROVAL",
+              mentionLeader: true,
+              mentionComment: "请今天内确认方案"
+            }
+          ],
+          total: 1,
+          page: 1,
+          pageSize: 20
+        })
+      });
+    globalThis.fetch = fetchMock as typeof fetch;
+
+    render(<ManagerReviewsPage />);
+    await waitFor(() => {
+      expect(screen.getByText("需要主管关注")).toBeInTheDocument();
+      expect(screen.getByText("@领导提醒：请今天内确认方案")).toBeInTheDocument();
+      expect(screen.getByText(/请今天内确认方案/)).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "只看@领导提醒" }));
+    await waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledWith(
+        "/api/weekly-reports?status=PENDING_APPROVAL&page=1&pageSize=20&mentionLeaderOnly=true",
+        expect.objectContaining({ method: "GET" })
+      );
+    });
+  });
+
   it("loads filter options and supports active filter tags clear all", async () => {
     const fetchMock = jest
       .fn()

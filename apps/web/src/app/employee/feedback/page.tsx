@@ -35,6 +35,8 @@ export default function EmployeeFeedbackPage() {
   const [nextWeekText, setNextWeekText] = useState("");
   const [risksText, setRisksText] = useState("");
   const [needsHelpText, setNeedsHelpText] = useState("");
+  const [mentionLeader, setMentionLeader] = useState(false);
+  const [mentionComment, setMentionComment] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [resubmittingId, setResubmittingId] = useState<number | null>(null);
   const [notice, setNotice] = useState("");
@@ -86,13 +88,17 @@ export default function EmployeeFeedbackPage() {
         thisWeekText: thisWeekText.trim(),
         nextWeekText: nextWeekText.trim(),
         risksText: risksText.trim(),
-        needsHelpText: needsHelpText.trim()
+        needsHelpText: needsHelpText.trim(),
+        mentionLeader,
+        mentionComment: mentionComment.trim()
       });
       setNotice("周报已提交，等待直属主管审批。");
       setThisWeekText("");
       setNextWeekText("");
       setRisksText("");
       setNeedsHelpText("");
+      setMentionLeader(false);
+      setMentionComment("");
       await loadFeedback();
     } catch (submitError) {
       if (submitError instanceof ApiClientError && submitError.status === 401) {
@@ -223,6 +229,22 @@ export default function EmployeeFeedbackPage() {
             placeholder="需协助事项"
             value={needsHelpText}
             onChange={(event) => setNeedsHelpText(event.target.value)}
+          />
+          <label>
+            <input
+              aria-label="@直属领导提醒"
+              type="checkbox"
+              checked={mentionLeader}
+              onChange={(event) => setMentionLeader(event.target.checked)}
+            />{" "}
+            @直属领导提醒查阅
+          </label>
+          <input
+            aria-label="@提醒备注"
+            placeholder="@提醒备注（可选）"
+            value={mentionComment}
+            onChange={(event) => setMentionComment(event.target.value)}
+            disabled={!mentionLeader}
           />
           <button type="button" onClick={() => void submitWeeklyReport()} disabled={submitting}>
             {submitting ? "提交中..." : "提交周报"}

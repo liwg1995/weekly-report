@@ -35,11 +35,15 @@ describe("Reports (e2e)", () => {
         thisWeekText: "完成登录和组织管理",
         nextWeekText: "开始审批流开发",
         risksText: "暂无",
-        needsHelpText: ""
+        needsHelpText: "",
+        mentionLeader: true,
+        mentionComment: "@leader 请优先查阅"
       })
       .expect(201);
 
     expect(res.body.status).toBe("PENDING_APPROVAL");
+    expect(res.body.mentionLeader).toBe(true);
+    expect(res.body.mentionComment).toBe("@leader 请优先查阅");
   });
 
   it("can resubmit report after rejected", async () => {
@@ -263,5 +267,41 @@ describe("Reports (e2e)", () => {
     const leaderIds = byLeader.body.items.map((item: { id: number }) => item.id);
     expect(leaderIds).toContain(reportA.body.id);
     expect(leaderIds).not.toContain(reportB.body.id);
+  });
+
+  it("can filter pending list by mentionLeader flag", async () => {
+    const withMention = await request(app.getHttpServer())
+      .post("/weekly-reports")
+      .set("Authorization", `Bearer ${token}`)
+      .send({
+        cycleId: 12,
+        thisWeekText: "with mention",
+        nextWeekText: "next",
+        risksText: "",
+        needsHelpText: "",
+        mentionLeader: true,
+        mentionComment: "请直属主管优先看"
+      })
+      .expect(201);
+    const withoutMention = await request(app.getHttpServer())
+      .post("/weekly-reports")
+      .set("Authorization", `Bearer ${token}`)
+      .send({
+        cycleId: 13,
+        thisWeekText: "without mention",
+        nextWeekText: "next",
+        risksText: "",
+        needsHelpText: ""
+      })
+      .expect(201);
+
+    const mentionOnly = await request(app.getHttpServer())
+      .get("/weekly-reports?status=PENDING_APPROVAL&mentionLeaderOnly=true")
+      .set("Authorization", `Bearer ${token}`)
+      .expect(200);
+
+    const ids = mentionOnly.body.items.map((item: { id: number }) => item.id);
+    expect(ids).toContain(withMention.body.id);
+    expect(ids).not.toContain(withoutMention.body.id);
   });
 });

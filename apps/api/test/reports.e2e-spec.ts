@@ -6,6 +6,7 @@ import { AppModule } from "../src/app.module";
 describe("Reports (e2e)", () => {
   let app: INestApplication;
   let token = "";
+  let adminUserId = 0;
 
   beforeEach(async () => {
     const moduleFixture = await Test.createTestingModule({
@@ -20,6 +21,7 @@ describe("Reports (e2e)", () => {
       .send({ username: "admin", password: "123456" })
       .expect(201);
     token = login.body.accessToken;
+    adminUserId = login.body.user.id;
   });
 
   afterEach(async () => {
@@ -376,5 +378,79 @@ describe("Reports (e2e)", () => {
     expect(mentionIndex).toBeGreaterThanOrEqual(0);
     expect(normalIndex).toBeGreaterThanOrEqual(0);
     expect(mentionIndex).toBeLessThan(normalIndex);
+  });
+
+  it("can filter pending list by my direct team", async () => {
+    const suffix = `${Date.now()}_direct`;
+    const direct = await request(app.getHttpServer())
+      .post("/users")
+      .set("Authorization", `Bearer ${token}`)
+      .send({ username: `direct_${suffix}`, realName: "Direct Member" })
+      .expect(201);
+    const nonDirect = await request(app.getHttpServer())
+      .post("/users")
+      .set("Authorization", `Bearer ${token}`)
+      .send({ username: `nondirect_${suffix}`, realName: "Non Direct Member" })
+      .expect(201);
+    const leader = await request(app.getHttpServer())
+      .post("/users")
+      .set("Authorization", `Bearer ${token}`)
+      .send({ username: `leader_${suffix}`, realName: "Some Leader" })
+      .expect(201);
+
+    await request(app.getHttpServer())
+      .patch(`/users/${direct.body.id}/leader`)
+      .set("Authorization", `Bearer ${token}`)
+      .send({ leaderUserId: adminUserId })
+      .expect(200);
+    await request(app.getHttpServer())
+      .patch(`/users/${nonDirect.body.id}/leader`)
+      .set("Authorization", `Bearer ${token}`)
+      .send({ leaderUserId: leader.body.id })
+      .expect(200);
+
+    const directToken = (
+      await request(app.getHttpServer())
+        .post("/auth/login")
+        .send({ username: `direct_${suffix}`, password: "123456" })
+        .expect(201)
+    ).body.accessToken as string;
+    const nonDirectToken = (
+      await request(app.getHttpServer())
+        .post("/auth/login")
+        .send({ username: `nondirect_${suffix}`, password: "123456" })
+        .expect(201)
+    ).body.accessToken as string;
+
+    const directReport = await request(app.getHttpServer())
+      .post("/weekly-reports")
+      .set("Authorization", `Bearer ${directToken}`)
+      .send({
+        cycleId: 17,
+        thisWeekText: "direct report",
+        nextWeekText: "next",
+        risksText: "",
+        needsHelpText: ""
+      })
+      .expect(201);
+    const nonDirectReport = await request(app.getHttpServer())
+      .post("/weekly-reports")
+      .set("Authorization", `Bearer ${nonDirectToken}`)
+      .send({
+        cycleId: 18,
+        thisWeekText: "non direct report",
+        nextWeekText: "next",
+        risksText: "",
+        needsHelpText: ""
+      })
+      .expect(201);
+
+    const myDirectOnly = await request(app.getHttpServer())
+      .get("/weekly-reports?status=PENDING_APPROVAL&myDirectOnly=true")
+      .set("Authorization", `Bearer ${token}`)
+      .expect(200);
+    const ids = myDirectOnly.body.items.map((item: { id: number }) => item.id);
+    expect(ids).toContain(directReport.body.id);
+    expect(ids).not.toContain(nonDirectReport.body.id);
   });
 });

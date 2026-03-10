@@ -175,6 +175,7 @@ export class ReportsService {
       overdueFirst?: boolean;
       mentionLeaderOnly?: boolean;
       mentionFirst?: boolean;
+      myDirectOnly?: boolean;
     }
   ) {
     const page = Math.max(1, query?.page ?? 1);
@@ -204,6 +205,13 @@ export class ReportsService {
       ...(query?.mentionLeaderOnly
         ? {
             mentionLeader: true
+          }
+        : {}),
+      ...(query?.myDirectOnly
+        ? {
+            user: {
+              leaderUserId: user.id
+            }
           }
         : {}),
       ...(keyword

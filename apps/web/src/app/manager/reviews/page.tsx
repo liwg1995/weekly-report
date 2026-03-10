@@ -261,6 +261,7 @@ export default function ManagerReviewsPage() {
   const [listOverdueFirst, setListOverdueFirst] = useState(false);
   const [listMentionLeaderOnly, setListMentionLeaderOnly] = useState(false);
   const [listMentionFirst, setListMentionFirst] = useState(false);
+  const [listMyDirectOnly, setListMyDirectOnly] = useState(false);
   const [filterDepartments, setFilterDepartments] = useState<Array<{ id: number; name: string }>>(
     () => cachedFilterOptions.departments
   );
@@ -465,6 +466,7 @@ export default function ManagerReviewsPage() {
       overdueFirst?: boolean;
       mentionLeaderOnly?: boolean;
       mentionFirst?: boolean;
+      myDirectOnly?: boolean;
     }
   ) => {
     const nextPage = query?.page ?? listPage;
@@ -475,6 +477,7 @@ export default function ManagerReviewsPage() {
     const nextOverdueFirst = query?.overdueFirst ?? listOverdueFirst;
     const nextMentionLeaderOnly = query?.mentionLeaderOnly ?? listMentionLeaderOnly;
     const nextMentionFirst = query?.mentionFirst ?? listMentionFirst;
+    const nextMyDirectOnly = query?.myDirectOnly ?? listMyDirectOnly;
     const params = new URLSearchParams();
     params.set("status", "PENDING_APPROVAL");
     const useLegacyDefaultQuery =
@@ -485,7 +488,8 @@ export default function ManagerReviewsPage() {
       !nextLeaderUserId &&
       !nextOverdueFirst &&
       !nextMentionLeaderOnly &&
-      !nextMentionFirst;
+      !nextMentionFirst &&
+      !nextMyDirectOnly;
     if (!useLegacyDefaultQuery) {
       params.set("page", String(nextPage));
       params.set("pageSize", String(nextPageSize));
@@ -507,6 +511,9 @@ export default function ManagerReviewsPage() {
     }
     if (nextMentionFirst) {
       params.set("mentionFirst", "true");
+    }
+    if (nextMyDirectOnly) {
+      params.set("myDirectOnly", "true");
     }
 
     try {
@@ -1560,7 +1567,8 @@ export default function ManagerReviewsPage() {
     selectedLeader ? `直属领导：${selectedLeader.realName}（${selectedLeader.username}）` : "",
     listOverdueFirst ? "逾期优先" : "",
     listMentionLeaderOnly ? "@领导提醒" : "",
-    listMentionFirst ? "提醒优先排序" : ""
+    listMentionFirst ? "提醒优先排序" : "",
+    listMyDirectOnly ? "仅我直属团队" : ""
   ].filter(Boolean);
   const filterOptionsUpdatedAtText = filterOptionsFetchedAt
     ? new Date(filterOptionsFetchedAt).toLocaleString("zh-CN")
@@ -1747,6 +1755,15 @@ export default function ManagerReviewsPage() {
             />{" "}
             提醒优先
           </label>
+          <label>
+            <input
+              type="checkbox"
+              aria-label="仅我直属团队"
+              checked={listMyDirectOnly}
+              onChange={(event) => setListMyDirectOnly(event.target.checked)}
+            />{" "}
+            仅我直属团队
+          </label>
           <button
             type="button"
             onClick={() => {
@@ -1759,7 +1776,8 @@ export default function ManagerReviewsPage() {
                 leaderUserId: listLeaderUserId,
                 overdueFirst: true,
                 mentionLeaderOnly: listMentionLeaderOnly,
-                mentionFirst: listMentionFirst
+                mentionFirst: listMentionFirst,
+                myDirectOnly: listMyDirectOnly
               });
             }}
           >
@@ -1777,7 +1795,8 @@ export default function ManagerReviewsPage() {
                 leaderUserId: listLeaderUserId,
                 overdueFirst: listOverdueFirst,
                 mentionLeaderOnly: true,
-                mentionFirst: listMentionFirst
+                mentionFirst: listMentionFirst,
+                myDirectOnly: listMyDirectOnly
               });
             }}
           >
@@ -1795,11 +1814,31 @@ export default function ManagerReviewsPage() {
                 leaderUserId: listLeaderUserId,
                 overdueFirst: listOverdueFirst,
                 mentionLeaderOnly: listMentionLeaderOnly,
-                mentionFirst: true
+                mentionFirst: true,
+                myDirectOnly: listMyDirectOnly
               });
             }}
           >
             提醒优先排序
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setListMyDirectOnly(true);
+              void loadPendingReports({
+                page: 1,
+                pageSize: listPageSize,
+                keyword: listKeywordInput.trim(),
+                departmentId: listDepartmentId,
+                leaderUserId: listLeaderUserId,
+                overdueFirst: listOverdueFirst,
+                mentionLeaderOnly: listMentionLeaderOnly,
+                mentionFirst: listMentionFirst,
+                myDirectOnly: true
+              });
+            }}
+          >
+            仅我直属团队
           </button>
           <button
             type="button"
@@ -1814,7 +1853,8 @@ export default function ManagerReviewsPage() {
                 leaderUserId: listLeaderUserId,
                 overdueFirst: listOverdueFirst,
                 mentionLeaderOnly: listMentionLeaderOnly,
-                mentionFirst: listMentionFirst
+                mentionFirst: listMentionFirst,
+                myDirectOnly: listMyDirectOnly
               });
             }}
           >
@@ -1830,6 +1870,7 @@ export default function ManagerReviewsPage() {
               setListOverdueFirst(false);
               setListMentionLeaderOnly(false);
               setListMentionFirst(false);
+              setListMyDirectOnly(false);
               void loadPendingReports({
                 page: 1,
                 pageSize: listPageSize,
@@ -1838,7 +1879,8 @@ export default function ManagerReviewsPage() {
                 leaderUserId: undefined,
                 overdueFirst: false,
                 mentionLeaderOnly: false,
-                mentionFirst: false
+                mentionFirst: false,
+                myDirectOnly: false
               });
             }}
           >
@@ -1864,7 +1906,8 @@ export default function ManagerReviewsPage() {
                     departmentId: listDepartmentId,
                     leaderUserId: listLeaderUserId,
                     overdueFirst: listOverdueFirst,
-                    mentionFirst: listMentionFirst
+                    mentionFirst: listMentionFirst,
+                    myDirectOnly: listMyDirectOnly
                   });
                 }}
               >
@@ -1884,7 +1927,8 @@ export default function ManagerReviewsPage() {
                     departmentId: undefined,
                     leaderUserId: listLeaderUserId,
                     overdueFirst: listOverdueFirst,
-                    mentionFirst: listMentionFirst
+                    mentionFirst: listMentionFirst,
+                    myDirectOnly: listMyDirectOnly
                   });
                 }}
               >
@@ -1904,7 +1948,8 @@ export default function ManagerReviewsPage() {
                     departmentId: listDepartmentId,
                     leaderUserId: undefined,
                     overdueFirst: listOverdueFirst,
-                    mentionFirst: listMentionFirst
+                    mentionFirst: listMentionFirst,
+                    myDirectOnly: listMyDirectOnly
                   });
                 }}
               >
@@ -1925,7 +1970,8 @@ export default function ManagerReviewsPage() {
                     leaderUserId: listLeaderUserId,
                     overdueFirst: false,
                     mentionLeaderOnly: listMentionLeaderOnly,
-                    mentionFirst: listMentionFirst
+                    mentionFirst: listMentionFirst,
+                    myDirectOnly: listMyDirectOnly
                   });
                 }}
               >
@@ -1946,7 +1992,8 @@ export default function ManagerReviewsPage() {
                     leaderUserId: listLeaderUserId,
                     overdueFirst: listOverdueFirst,
                     mentionLeaderOnly: false,
-                    mentionFirst: listMentionFirst
+                    mentionFirst: listMentionFirst,
+                    myDirectOnly: listMyDirectOnly
                   });
                 }}
               >
@@ -1967,11 +2014,34 @@ export default function ManagerReviewsPage() {
                     leaderUserId: listLeaderUserId,
                     overdueFirst: listOverdueFirst,
                     mentionLeaderOnly: listMentionLeaderOnly,
-                    mentionFirst: false
+                    mentionFirst: false,
+                    myDirectOnly: listMyDirectOnly
                   });
                 }}
               >
                 提醒优先排序 ×
+              </button>
+            ) : null}
+            {listMyDirectOnly ? (
+              <button
+                type="button"
+                className="review-filter-tag"
+                onClick={() => {
+                  setListMyDirectOnly(false);
+                  void loadPendingReports({
+                    page: 1,
+                    pageSize: listPageSize,
+                    keyword: listKeyword,
+                    departmentId: listDepartmentId,
+                    leaderUserId: listLeaderUserId,
+                    overdueFirst: listOverdueFirst,
+                    mentionLeaderOnly: listMentionLeaderOnly,
+                    mentionFirst: listMentionFirst,
+                    myDirectOnly: false
+                  });
+                }}
+              >
+                仅我直属团队 ×
               </button>
             ) : null}
             <button
@@ -1985,6 +2055,7 @@ export default function ManagerReviewsPage() {
                 setListOverdueFirst(false);
                 setListMentionLeaderOnly(false);
                 setListMentionFirst(false);
+                setListMyDirectOnly(false);
                 void loadPendingReports({
                   page: 1,
                   pageSize: listPageSize,
@@ -1993,7 +2064,8 @@ export default function ManagerReviewsPage() {
                   leaderUserId: undefined,
                   overdueFirst: false,
                   mentionLeaderOnly: false,
-                  mentionFirst: false
+                  mentionFirst: false,
+                  myDirectOnly: false
                 });
               }}
             >

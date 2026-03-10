@@ -754,6 +754,51 @@ describe("ManagerReviewsPage", () => {
     });
   });
 
+  it("supports my-direct-team quick filter query", async () => {
+    const fetchMock = jest
+      .fn()
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => ({
+          items: [{ id: 958, thisWeekText: "直属团队任务", status: "PENDING_APPROVAL" }],
+          total: 1,
+          page: 1,
+          pageSize: 20
+        })
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => ({ items: [] })
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => ({
+          items: [{ id: 958, thisWeekText: "直属团队任务", status: "PENDING_APPROVAL" }],
+          total: 1,
+          page: 1,
+          pageSize: 20
+        })
+      });
+    globalThis.fetch = fetchMock as typeof fetch;
+
+    render(<ManagerReviewsPage />);
+    await waitFor(() => {
+      expect(screen.getByText("直属团队任务")).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "仅我直属团队" }));
+
+    await waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledWith(
+        "/api/weekly-reports?status=PENDING_APPROVAL&page=1&pageSize=20&myDirectOnly=true",
+        expect.objectContaining({ method: "GET" })
+      );
+    });
+  });
+
   it("loads filter options and supports active filter tags clear all", async () => {
     const fetchMock = jest
       .fn()

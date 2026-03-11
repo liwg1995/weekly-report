@@ -42,6 +42,11 @@ describe("EmployeeFeedbackPage", () => {
       .mockResolvedValueOnce({
         ok: true,
         status: 200,
+        json: async () => ({ items: [] })
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
         json: async () => ({
           items: [
             {
@@ -88,6 +93,13 @@ describe("EmployeeFeedbackPage", () => {
       .mockResolvedValueOnce({
         ok: true,
         status: 200,
+        json: async () => ({
+          items: [{ id: 88, status: "APPROVED", thisWeekText: "x" }]
+        })
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
         json: async () => ({ items: [] })
       }) as typeof fetch;
 
@@ -125,6 +137,11 @@ describe("EmployeeFeedbackPage", () => {
             }
           ]
         })
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => ({ items: [] })
       })
       .mockResolvedValueOnce({
         ok: true,
@@ -297,6 +314,11 @@ describe("EmployeeFeedbackPage", () => {
       .mockResolvedValueOnce({
         ok: true,
         status: 200,
+        json: async () => ({ items: [] })
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
         json: async () => ({
           items: [
             {
@@ -319,6 +341,38 @@ describe("EmployeeFeedbackPage", () => {
 
     fireEvent.click(screen.getByRole("button", { name: /展开/ }));
     expect(screen.getByRole("button", { name: /收起/ })).toBeInTheDocument();
+  });
+
+  it("shows my report overview stats and recent list", async () => {
+    globalThis.fetch = jest
+      .fn()
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => ({ items: [] })
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => ({
+          items: [
+            { id: 101, status: "PENDING_APPROVAL", thisWeekText: "推进审批优化" },
+            { id: 102, status: "APPROVED", thisWeekText: "完成组织梳理" },
+            { id: 103, status: "REJECTED", thisWeekText: "补充风险说明" }
+          ]
+        })
+      }) as typeof fetch;
+
+    render(<EmployeeFeedbackPage />);
+
+    await waitFor(() => {
+      expect(screen.getByText("我的周报概览")).toBeInTheDocument();
+      expect(screen.getByText("待审批：1")).toBeInTheDocument();
+      expect(screen.getByText("已通过：1")).toBeInTheDocument();
+      expect(screen.getByText("已驳回：1")).toBeInTheDocument();
+      expect(screen.getByText("总数：3")).toBeInTheDocument();
+      expect(screen.getByText("#101 推进审批优化（PENDING_APPROVAL）")).toBeInTheDocument();
+    });
   });
 
   it("redirects manager role to reviews page", async () => {
@@ -369,6 +423,16 @@ describe("EmployeeFeedbackPage", () => {
       .mockResolvedValueOnce({
         ok: true,
         status: 200,
+        json: async () => ({
+          items: [
+            { id: 61, status: "REJECTED", thisWeekText: "x" },
+            { id: 62, status: "APPROVED", thisWeekText: "y" }
+          ]
+        })
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
         json: async () => ({ items: [] })
       }) as typeof fetch;
 
@@ -389,8 +453,18 @@ describe("EmployeeFeedbackPage", () => {
       })
       .mockResolvedValueOnce({
         ok: true,
+        status: 200,
+        json: async () => ({ items: [] })
+      })
+      .mockResolvedValueOnce({
+        ok: true,
         status: 201,
         json: async () => ({ id: 3001, status: "PENDING_APPROVAL" })
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => ({ items: [] })
       })
       .mockResolvedValueOnce({
         ok: true,
@@ -462,6 +536,11 @@ describe("EmployeeFeedbackPage", () => {
       .mockResolvedValueOnce({
         ok: true,
         status: 200,
+        json: async () => ({ items: [] })
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
         json: async () => ({ id: 77, status: "PENDING_APPROVAL" })
       })
       .mockResolvedValueOnce({
@@ -479,6 +558,11 @@ describe("EmployeeFeedbackPage", () => {
             }
           ]
         })
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => ({ items: [] })
       })
       .mockResolvedValueOnce({
         ok: true,

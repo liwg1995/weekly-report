@@ -25,8 +25,17 @@ type TimelineItem = {
   reviewer: { realName: string; username: string };
 };
 
+type MyReportItem = {
+  id: number;
+  status: string;
+  thisWeekText: string;
+  submittedAt?: string;
+  updatedAt?: string;
+};
+
 export default function EmployeeFeedbackPage() {
   const [items, setItems] = useState<FeedbackItem[]>([]);
+  const [myReports, setMyReports] = useState<MyReportItem[]>([]);
   const [timeline, setTimeline] = useState<TimelineItem[]>([]);
   const [selectedReportId, setSelectedReportId] = useState<number | null>(null);
   const [filter, setFilter] = useState<"all" | "REJECTED" | "APPROVED">("all");
@@ -60,22 +69,32 @@ export default function EmployeeFeedbackPage() {
       items: TimelineItem[];
     }>(`/api/weekly-reports/${reportId}/timeline`);
     setSelectedReportId(reportId);
-    setTimeline(timelineData.items);
+    setTimeline(timelineData.items ?? []);
     setExpandedIds([]);
   };
 
   const loadFeedback = async () => {
-    const feedbackData = await apiGet<{
-      items: FeedbackItem[];
-    }>("/api/weekly-reports/mine/feedback");
-    setItems(feedbackData.items);
-    if (feedbackData.items.length > 0) {
+    const [feedbackData, myReportsData] = await Promise.all([
+      apiGet<{
+        items: FeedbackItem[];
+      }>("/api/weekly-reports/mine/feedback"),
+      apiGet<{
+        items: MyReportItem[];
+      }>("/api/weekly-reports?page=1&pageSize=50")
+    ]);
+    setItems(feedbackData.items ?? []);
+    setMyReports(myReportsData.items || []);
+    if ((feedbackData.items ?? []).length > 0) {
       await loadTimeline(feedbackData.items[0].reportId);
     } else {
       setSelectedReportId(null);
       setTimeline([]);
     }
   };
+
+  const pendingCount = myReports.filter((item) => item.status === "PENDING_APPROVAL").length;
+  const approvedCount = myReports.filter((item) => item.status === "APPROVED").length;
+  const rejectedCount = myReports.filter((item) => item.status === "REJECTED").length;
 
   const submitWeeklyReport = async () => {
     if (!thisWeekText.trim() || !nextWeekText.trim()) {
@@ -190,6 +209,36 @@ export default function EmployeeFeedbackPage() {
       {loading ? <p>加载中...</p> : null}
       {error ? <p style={{ color: "var(--danger)" }}>{error}</p> : null}
       {notice ? <p style={{ color: "var(--primary-strong)" }}>{notice}</p> : null}
+
+      {!loading && !error ? (
+        <section
+          style={{
+            border: "1px solid var(--border)",
+            borderRadius: "12px",
+            padding: "14px",
+            marginBottom: "16px"
+          }}
+        >
+          <h2 style={{ margin: 0, fontSize: "18px" }}>我的周报概览</h2>
+          <div style={{ display: "flex", gap: "10px", marginTop: "10px", flexWrap: "wrap" }}>
+            <span>待审批：{pendingCount}</span>
+            <span>已通过：{approvedCount}</span>
+            <span>已驳回：{rejectedCount}</span>
+            <span>总数：{myReports.length}</span>
+          </div>
+          {myReports.length > 0 ? (
+            <ul style={{ margin: "10px 0 0", paddingLeft: "18px" }}>
+              {myReports.slice(0, 5).map((item) => (
+                <li key={item.id}>
+                  #{item.id} {item.thisWeekText}（{item.status}）
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p style={{ marginBottom: 0 }}>暂无提交记录。</p>
+          )}
+        </section>
+      ) : null}
 
       {!loading && !error ? (
         <section

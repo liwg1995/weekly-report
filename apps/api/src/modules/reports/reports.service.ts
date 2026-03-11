@@ -468,15 +468,31 @@ export class ReportsService {
     };
   }
 
-  async listReviewNudgeTasks(user: AuthUser, query?: { limit?: number }) {
+  async listReviewNudgeTasks(
+    user: AuthUser,
+    query?: { limit?: number; page?: number; pageSize?: number; status?: string; level?: string }
+  ) {
     this.ensureCanManageReviews(user);
-    const limit = Math.min(20, Math.max(1, query?.limit ?? 5));
-    const items = await this.prisma.reviewNudgeTask.findMany({
-      where: { creatorUserId: user.id },
-      orderBy: { id: "desc" },
-      take: limit
-    });
+    const page = Math.max(1, query?.page ?? 1);
+    const pageSize = Math.min(20, Math.max(1, query?.pageSize ?? query?.limit ?? 5));
+    const where: Prisma.ReviewNudgeTaskWhereInput = {
+      creatorUserId: user.id,
+      ...(query?.status ? { status: query.status } : {}),
+      ...(query?.level ? { level: query.level } : {})
+    };
+    const [total, items] = await this.prisma.$transaction([
+      this.prisma.reviewNudgeTask.count({ where }),
+      this.prisma.reviewNudgeTask.findMany({
+        where,
+        orderBy: { id: "desc" },
+        skip: (page - 1) * pageSize,
+        take: pageSize
+      })
+    ]);
     return {
+      total,
+      page,
+      pageSize,
       items: items.map((item) => ({
         id: item.id,
         level: item.level,
@@ -531,6 +547,39 @@ export class ReportsService {
       targetCount: updated.targetCount,
       message: updated.message,
       createdAt: updated.createdAt
+    };
+  }
+
+  async retryReviewNudgeTasks(user: AuthUser, ids: number[]) {
+    this.ensureCanManageReviews(user);
+    const normalizedIds = [...new Set((ids ?? []).filter((id) => Number.isInteger(id) && id > 0))].slice(0, 200);
+    if (normalizedIds.length === 0) {
+      throw new BadRequestException("请至少选择一条催办任务");
+    }
+    const updated = await this.prisma.reviewNudgeTask.updateMany({
+      where: {
+        creatorUserId: user.id,
+        id: { in: normalizedIds }
+      },
+      data: {
+        status: "PENDING"
+      }
+    });
+
+    await this.prisma.auditLog.create({
+      data: {
+        actorUserId: user.id,
+        action: "REVIEW_NUDGE_BATCH_RETRY",
+        targetType: "review_nudge_task",
+        targetId: normalizedIds.join(","),
+        afterJson: {
+          count: updated.count
+        }
+      }
+    });
+
+    return {
+      count: updated.count
     };
   }
 }

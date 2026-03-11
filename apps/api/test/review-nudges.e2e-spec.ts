@@ -69,4 +69,50 @@ describe("Review Nudges (e2e)", () => {
       .expect(200);
     expect(retry.body.status).toBe("PENDING");
   });
+
+  it("supports nudge queue filter, pagination and batch retry", async () => {
+    const a = await request(app.getHttpServer())
+      .post("/weekly-reports/review-nudges")
+      .set("Authorization", `Bearer ${token}`)
+      .send({ level: "SLA24", targetReportIds: [1] })
+      .expect(201);
+    const b = await request(app.getHttpServer())
+      .post("/weekly-reports/review-nudges")
+      .set("Authorization", `Bearer ${token}`)
+      .send({ level: "SLA48", targetReportIds: [2] })
+      .expect(201);
+
+    await request(app.getHttpServer())
+      .patch(`/weekly-reports/review-nudges/${a.body.id}`)
+      .set("Authorization", `Bearer ${token}`)
+      .send({ action: "markFailed" })
+      .expect(200);
+    await request(app.getHttpServer())
+      .patch(`/weekly-reports/review-nudges/${b.body.id}`)
+      .set("Authorization", `Bearer ${token}`)
+      .send({ action: "markSent" })
+      .expect(200);
+
+    const failedOnly = await request(app.getHttpServer())
+      .get("/weekly-reports/review-nudges?page=1&pageSize=1&status=FAILED")
+      .set("Authorization", `Bearer ${token}`)
+      .expect(200);
+    expect(failedOnly.body.total).toBeGreaterThanOrEqual(1);
+    expect(failedOnly.body.items[0].status).toBe("FAILED");
+
+    const batchRetry = await request(app.getHttpServer())
+      .post("/weekly-reports/review-nudges/retry-batch")
+      .set("Authorization", `Bearer ${token}`)
+      .send({ ids: [a.body.id, b.body.id] })
+      .expect(201);
+    expect(batchRetry.body.count).toBe(2);
+
+    const retried = await request(app.getHttpServer())
+      .get("/weekly-reports/review-nudges?status=PENDING")
+      .set("Authorization", `Bearer ${token}`)
+      .expect(200);
+    const ids = retried.body.items.map((item: { id: number }) => item.id);
+    expect(ids).toContain(a.body.id);
+    expect(ids).toContain(b.body.id);
+  });
 });

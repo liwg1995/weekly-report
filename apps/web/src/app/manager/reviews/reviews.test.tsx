@@ -570,7 +570,8 @@ describe("ManagerReviewsPage", () => {
       expect(screen.getByText(/直属领导: 李主管/)).toBeInTheDocument();
     });
 
-    fireEvent.click(screen.getByRole("button", { name: "下一页" }));
+    const nextButtons = screen.getAllByRole("button", { name: "下一页" });
+    fireEvent.click(nextButtons.find((button) => !(button as HTMLButtonElement).disabled) as HTMLElement);
 
     await waitFor(() => {
       expect(fetchMock).toHaveBeenCalledWith(
@@ -1034,7 +1035,7 @@ describe("ManagerReviewsPage", () => {
       expect(
         screen.getByText("催办任务已创建：超24h待办 2 条（企业微信/钉钉提醒待接入）。")
       ).toBeInTheDocument();
-      expect(screen.getByText("催办队列（最近5条）")).toBeInTheDocument();
+      expect(screen.getByText("催办队列")).toBeInTheDocument();
       expect(screen.getByText("#8801 SLA24 / 2条 / PENDING")).toBeInTheDocument();
     });
   });
@@ -1059,7 +1060,7 @@ describe("ManagerReviewsPage", () => {
       if (url.includes("/api/audit-logs/reviews?limit=10")) {
         return { ok: true, status: 200, json: async () => ({ items: [] }) } as Response;
       }
-      if (url.includes("/api/weekly-reports/review-nudges?limit=5")) {
+      if (url.includes("/api/weekly-reports/review-nudges?page=1&pageSize=5")) {
         return {
           ok: true,
           status: 200,
@@ -1116,7 +1117,7 @@ describe("ManagerReviewsPage", () => {
     render(<ManagerReviewsPage />);
 
     await waitFor(() => {
-      expect(screen.getByText("催办队列（最近5条）")).toBeInTheDocument();
+      expect(screen.getByText("催办队列")).toBeInTheDocument();
       expect(screen.getByText("暂无催办任务")).toBeInTheDocument();
     });
 
@@ -1129,6 +1130,123 @@ describe("ManagerReviewsPage", () => {
     await waitFor(() => {
       expect(screen.getByText("催办任务 #9901 状态已更新为 SENT")).toBeInTheDocument();
       expect(screen.getByText("#9901 SLA24 / 1条 / SENT")).toBeInTheDocument();
+    });
+  });
+
+  it("supports nudge queue status filter and batch retry", async () => {
+    const fetchMock = jest
+      .fn()
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => ({
+          items: [{ id: 1741, thisWeekText: "nudge-batch", status: "PENDING_APPROVAL" }],
+          total: 1,
+          page: 1,
+          pageSize: 20
+        })
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => ({ items: [] })
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => ({
+          items: [
+            {
+              id: 9911,
+              level: "SLA24",
+              status: "FAILED",
+              channel: "LOCAL_PLACEHOLDER",
+              targetCount: 1,
+              message: "失败任务",
+              createdAt: "2026-03-11T08:00:00.000Z"
+            }
+          ],
+          total: 1,
+          page: 1,
+          pageSize: 5
+        })
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => ({
+          items: [
+            {
+              id: 9911,
+              level: "SLA24",
+              status: "FAILED",
+              channel: "LOCAL_PLACEHOLDER",
+              targetCount: 1,
+              message: "失败任务",
+              createdAt: "2026-03-11T08:00:00.000Z"
+            }
+          ],
+          total: 1,
+          page: 1,
+          pageSize: 5
+        })
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 201,
+        json: async () => ({ count: 1 })
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => ({
+          items: [
+            {
+              id: 9911,
+              level: "SLA24",
+              status: "PENDING",
+              channel: "LOCAL_PLACEHOLDER",
+              targetCount: 1,
+              message: "失败任务",
+              createdAt: "2026-03-11T08:00:00.000Z"
+            }
+          ],
+          total: 1,
+          page: 1,
+          pageSize: 5
+        })
+      });
+    globalThis.fetch = fetchMock as typeof fetch;
+
+    render(<ManagerReviewsPage />);
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: "刷新催办队列" })).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "刷新催办队列" }));
+    await waitFor(() => {
+      expect(screen.getByText("#9911 SLA24 / 1条 / FAILED")).toBeInTheDocument();
+    });
+
+    fireEvent.change(screen.getByLabelText("催办状态筛选"), { target: { value: "FAILED" } });
+    await waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledWith(
+        "/api/weekly-reports/review-nudges?page=1&pageSize=5&status=FAILED",
+        expect.objectContaining({ method: "GET" })
+      );
+    });
+
+    fireEvent.click(screen.getByLabelText("选择催办任务-9911"));
+    fireEvent.click(screen.getByRole("button", { name: "批量重试" }));
+    await waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledWith(
+        "/api/weekly-reports/review-nudges/retry-batch",
+        expect.objectContaining({
+          method: "POST",
+          body: JSON.stringify({ ids: [9911] })
+        })
+      );
+      expect(screen.getByText("已批量重试 1 条催办任务")).toBeInTheDocument();
     });
   });
 

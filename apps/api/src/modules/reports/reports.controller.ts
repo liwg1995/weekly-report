@@ -92,9 +92,20 @@ export class ReportsController {
   }
 
   @Get("review-nudges")
-  reviewNudgeTasks(@Req() request: Request, @Query("limit") limit?: string) {
+  reviewNudgeTasks(
+    @Req() request: Request,
+    @Query("limit") limit?: string,
+    @Query("page") page?: string,
+    @Query("pageSize") pageSize?: string,
+    @Query("status") status?: string,
+    @Query("level") level?: string
+  ) {
     return this.reportsService.listReviewNudgeTasks((request as UserRequest).user, {
-      limit: limit ? Number(limit) : undefined
+      limit: limit ? Number(limit) : undefined,
+      page: page ? Number(page) : undefined,
+      pageSize: pageSize ? Number(pageSize) : undefined,
+      status,
+      level
     });
   }
 
@@ -108,6 +119,14 @@ export class ReportsController {
     }
   ) {
     return this.reportsService.updateReviewNudgeTask((request as UserRequest).user, id, body.action);
+  }
+
+  @Post("review-nudges/retry-batch")
+  retryReviewNudgeTasks(
+    @Req() request: Request,
+    @Body() body: { ids: number[] }
+  ) {
+    return this.reportsService.retryReviewNudgeTasks((request as UserRequest).user, body.ids ?? []);
   }
 
   @Get(":id/timeline")

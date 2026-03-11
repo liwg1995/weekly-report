@@ -64,6 +64,13 @@ type ReviewNudgeItem = {
   updatedAt?: string;
 };
 
+type ReviewNudgeListResponse = {
+  items: ReviewNudgeItem[];
+  total?: number;
+  page?: number;
+  pageSize?: number;
+};
+
 type ExportColumn = "time" | "actor" | "action" | "targetId";
 
 const EXPORT_PREFERENCES_KEY = "manager_reviews_export_preferences";
@@ -371,6 +378,12 @@ export default function ManagerReviewsPage() {
   const [rejectReason, setRejectReason] = useState("");
   const [logs, setLogs] = useState<AuditItem[]>([]);
   const [reviewNudges, setReviewNudges] = useState<ReviewNudgeItem[]>([]);
+  const [nudgeSelectedIds, setNudgeSelectedIds] = useState<number[]>([]);
+  const [nudgeStatusFilter, setNudgeStatusFilter] = useState<"all" | "PENDING" | "SENT" | "FAILED">("all");
+  const [nudgeLevelFilter, setNudgeLevelFilter] = useState<"all" | "SLA24" | "SLA48">("all");
+  const [nudgePage, setNudgePage] = useState(1);
+  const [nudgePageSize] = useState(5);
+  const [nudgeTotal, setNudgeTotal] = useState(0);
   const [logDecision, setLogDecision] = useState<"all" | "APPROVED" | "REJECTED">("all");
   const [logActorKeyword, setLogActorKeyword] = useState("");
   const [logDateFrom, setLogDateFrom] = useState("");
@@ -464,10 +477,25 @@ export default function ManagerReviewsPage() {
     }
   };
 
-  const loadReviewNudges = async () => {
+  const loadReviewNudges = async (options?: { page?: number; status?: "all" | "PENDING" | "SENT" | "FAILED"; level?: "all" | "SLA24" | "SLA48" }) => {
     try {
-      const data = await apiGet<{ items: ReviewNudgeItem[] }>("/api/weekly-reports/review-nudges?limit=5");
+      const nextPage = options?.page ?? nudgePage;
+      const nextStatus = options?.status ?? nudgeStatusFilter;
+      const nextLevel = options?.level ?? nudgeLevelFilter;
+      const params = new URLSearchParams();
+      params.set("page", String(nextPage));
+      params.set("pageSize", String(nudgePageSize));
+      if (nextStatus !== "all") {
+        params.set("status", nextStatus);
+      }
+      if (nextLevel !== "all") {
+        params.set("level", nextLevel);
+      }
+      const data = await apiGet<ReviewNudgeListResponse>(`/api/weekly-reports/review-nudges?${params.toString()}`);
       setReviewNudges(data.items ?? []);
+      setNudgeTotal(data.total ?? (data.items?.length ?? 0));
+      setNudgePage(data.page ?? nextPage);
+      setNudgeSelectedIds([]);
     } catch {
       // Ignore nudge list load failures to avoid blocking review flow.
     }
@@ -485,6 +513,22 @@ export default function ManagerReviewsPage() {
       await loadReviewNudges();
     } catch (err) {
       setError(err instanceof Error ? err.message : "更新催办任务状态失败，请稍后重试。");
+    }
+  };
+
+  const retrySelectedNudges = async () => {
+    if (nudgeSelectedIds.length === 0) {
+      setError("请至少选择一条催办任务");
+      return;
+    }
+    try {
+      const result = await apiPost<{ count: number }>("/api/weekly-reports/review-nudges/retry-batch", {
+        ids: nudgeSelectedIds
+      });
+      setNotice(`已批量重试 ${result.count} 条催办任务`);
+      await loadReviewNudges();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "批量重试失败，请稍后重试。");
     }
   };
 
@@ -2478,7 +2522,45 @@ export default function ManagerReviewsPage() {
           </div>
           <div style={{ marginTop: "8px" }}>
             <div style={{ color: "var(--muted)", fontSize: "12px", marginBottom: "6px" }}>
-              催办队列（最近5条）
+              催办队列
+            </div>
+            <div style={{ display: "flex", gap: "6px", flexWrap: "wrap", marginBottom: "6px" }}>
+              <select
+                aria-label="催办状态筛选"
+                value={nudgeStatusFilter}
+                onChange={(event) => {
+                  const next = event.target.value as "all" | "PENDING" | "SENT" | "FAILED";
+                  setNudgeStatusFilter(next);
+                  void loadReviewNudges({ page: 1, status: next, level: nudgeLevelFilter });
+                }}
+              >
+                <option value="all">全部状态</option>
+                <option value="PENDING">待发送</option>
+                <option value="SENT">已发送</option>
+                <option value="FAILED">失败</option>
+              </select>
+              <select
+                aria-label="催办级别筛选"
+                value={nudgeLevelFilter}
+                onChange={(event) => {
+                  const next = event.target.value as "all" | "SLA24" | "SLA48";
+                  setNudgeLevelFilter(next);
+                  void loadReviewNudges({ page: 1, status: nudgeStatusFilter, level: next });
+                }}
+              >
+                <option value="all">全部级别</option>
+                <option value="SLA24">SLA24</option>
+                <option value="SLA48">SLA48</option>
+              </select>
+              <button type="button" onClick={() => void loadReviewNudges({ page: 1 })}>
+                刷新催办队列
+              </button>
+              <button type="button" onClick={() => void retrySelectedNudges()}>
+                批量重试
+              </button>
+              <span style={{ color: "var(--muted)", fontSize: "12px", alignSelf: "center" }}>
+                已选 {nudgeSelectedIds.length} / 共 {nudgeTotal}
+              </span>
             </div>
             {reviewNudges.length === 0 ? (
               <div style={{ color: "var(--muted)", fontSize: "12px" }}>暂无催办任务</div>
@@ -2495,8 +2577,22 @@ export default function ManagerReviewsPage() {
                       gap: "6px"
                     }}
                   >
-                    <div style={{ fontSize: "12px" }}>
-                      #{item.id} {item.level} / {item.targetCount}条 / {item.status}
+                    <div style={{ fontSize: "12px", display: "flex", gap: "8px", alignItems: "center" }}>
+                      <input
+                        type="checkbox"
+                        aria-label={`选择催办任务-${item.id}`}
+                        checked={nudgeSelectedIds.includes(item.id)}
+                        onChange={(event) =>
+                          setNudgeSelectedIds((prev) =>
+                            event.target.checked
+                              ? [...new Set([...prev, item.id])]
+                              : prev.filter((x) => x !== item.id)
+                          )
+                        }
+                      />
+                      <span>
+                        #{item.id} {item.level} / {item.targetCount}条 / {item.status}
+                      </span>
                     </div>
                     <div style={{ color: "var(--muted)", fontSize: "12px" }}>{item.message}</div>
                     <div style={{ display: "flex", gap: "6px", flexWrap: "wrap" }}>
@@ -2514,6 +2610,25 @@ export default function ManagerReviewsPage() {
                 ))}
               </ul>
             )}
+            <div style={{ display: "flex", gap: "8px", marginTop: "8px", fontSize: "12px" }}>
+              <button
+                type="button"
+                disabled={nudgePage <= 1}
+                onClick={() => void loadReviewNudges({ page: Math.max(1, nudgePage - 1) })}
+              >
+                上一页
+              </button>
+              <button
+                type="button"
+                disabled={nudgePage * nudgePageSize >= nudgeTotal}
+                onClick={() => void loadReviewNudges({ page: nudgePage + 1 })}
+              >
+                下一页
+              </button>
+              <span style={{ color: "var(--muted)" }}>
+                第 {nudgePage} 页 / 每页 {nudgePageSize} 条 / 总计 {nudgeTotal}
+              </span>
+            </div>
           </div>
         </section>
       ) : null}

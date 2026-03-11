@@ -1034,8 +1034,101 @@ describe("ManagerReviewsPage", () => {
       expect(
         screen.getByText("催办任务已创建：超24h待办 2 条（企业微信/钉钉提醒待接入）。")
       ).toBeInTheDocument();
-      expect(screen.getByText("最近催办：")).toBeInTheDocument();
+      expect(screen.getByText("催办队列（最近5条）")).toBeInTheDocument();
       expect(screen.getByText("#8801 SLA24 / 2条 / PENDING")).toBeInTheDocument();
+    });
+  });
+
+  it("supports updating nudge queue item status", async () => {
+    let nudgeStatus: "PENDING" | "SENT" = "PENDING";
+    const fetchMock = jest.fn().mockImplementation(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      const method = init?.method || "GET";
+      if (url.includes("/api/weekly-reports?status=PENDING_APPROVAL")) {
+        return {
+          ok: true,
+          status: 200,
+          json: async () => ({
+            items: [{ id: 1731, thisWeekText: "nudge", status: "PENDING_APPROVAL" }],
+            total: 1,
+            page: 1,
+            pageSize: 20
+          })
+        } as Response;
+      }
+      if (url.includes("/api/audit-logs/reviews?limit=10")) {
+        return { ok: true, status: 200, json: async () => ({ items: [] }) } as Response;
+      }
+      if (url.includes("/api/weekly-reports/review-nudges?limit=5")) {
+        return {
+          ok: true,
+          status: 200,
+          json: async () => ({
+            items: [
+              {
+                id: 9901,
+                level: "SLA24",
+                status: nudgeStatus,
+                channel: "LOCAL_PLACEHOLDER",
+                targetCount: 1,
+                message: "超24h未处理催办任务，涉及 1 条周报",
+                createdAt: "2026-03-11T08:00:00.000Z"
+              }
+            ]
+          })
+        } as Response;
+      }
+      if (url.includes("/api/weekly-reports/review-nudges") && method === "POST") {
+        return {
+          ok: true,
+          status: 201,
+          json: async () => ({
+            id: 9901,
+            level: "SLA24",
+            status: "PENDING",
+            channel: "LOCAL_PLACEHOLDER",
+            targetCount: 1,
+            message: "超24h未处理催办任务，涉及 1 条周报",
+            createdAt: "2026-03-11T08:00:00.000Z"
+          })
+        } as Response;
+      }
+      if (url.includes("/api/weekly-reports/review-nudges/9901") && method === "PATCH") {
+        nudgeStatus = "SENT";
+        return {
+          ok: true,
+          status: 200,
+          json: async () => ({
+            id: 9901,
+            level: "SLA24",
+            status: "SENT",
+            channel: "LOCAL_PLACEHOLDER",
+            targetCount: 1,
+            message: "超24h未处理催办任务，涉及 1 条周报",
+            createdAt: "2026-03-11T08:00:00.000Z"
+          })
+        } as Response;
+      }
+      return { ok: true, status: 200, json: async () => ({ items: [] }) } as Response;
+    });
+    globalThis.fetch = fetchMock as typeof fetch;
+
+    render(<ManagerReviewsPage />);
+
+    await waitFor(() => {
+      expect(screen.getByText("催办队列（最近5条）")).toBeInTheDocument();
+      expect(screen.getByText("暂无催办任务")).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "一键催办（占位）" }));
+    await waitFor(() => {
+      expect(screen.getByText("#9901 SLA24 / 1条 / PENDING")).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "标记已发送" }));
+    await waitFor(() => {
+      expect(screen.getByText("催办任务 #9901 状态已更新为 SENT")).toBeInTheDocument();
+      expect(screen.getByText("#9901 SLA24 / 1条 / SENT")).toBeInTheDocument();
     });
   });
 

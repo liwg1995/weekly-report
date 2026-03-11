@@ -488,4 +488,26 @@ describe("Reports (e2e)", () => {
     expect(target.level).toBe("SLA24");
     expect(target.targetCount).toBe(1);
   });
+
+  it("can update review nudge task status to sent and retry", async () => {
+    const created = await request(app.getHttpServer())
+      .post("/weekly-reports/review-nudges")
+      .set("Authorization", `Bearer ${token}`)
+      .send({ level: "SLA24", targetReportIds: [] })
+      .expect(201);
+
+    const markSent = await request(app.getHttpServer())
+      .patch(`/weekly-reports/review-nudges/${created.body.id}`)
+      .set("Authorization", `Bearer ${token}`)
+      .send({ action: "markSent" })
+      .expect(200);
+    expect(markSent.body.status).toBe("SENT");
+
+    const retry = await request(app.getHttpServer())
+      .patch(`/weekly-reports/review-nudges/${created.body.id}`)
+      .set("Authorization", `Bearer ${token}`)
+      .send({ action: "retry" })
+      .expect(200);
+    expect(retry.body.status).toBe("PENDING");
+  });
 });

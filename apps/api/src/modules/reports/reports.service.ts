@@ -488,4 +488,49 @@ export class ReportsService {
       }))
     };
   }
+
+  async updateReviewNudgeTask(
+    user: AuthUser,
+    id: number,
+    action: "markSent" | "markFailed" | "retry"
+  ) {
+    this.ensureCanManageReviews(user);
+    const task = await this.prisma.reviewNudgeTask.findFirst({
+      where: {
+        id,
+        creatorUserId: user.id
+      }
+    });
+    if (!task) {
+      throw new NotFoundException("催办任务不存在");
+    }
+
+    const nextStatus =
+      action === "markSent" ? "SENT" : action === "markFailed" ? "FAILED" : "PENDING";
+    const updated = await this.prisma.reviewNudgeTask.update({
+      where: { id: task.id },
+      data: { status: nextStatus }
+    });
+
+    await this.prisma.auditLog.create({
+      data: {
+        actorUserId: user.id,
+        action: "REVIEW_NUDGE_UPDATED",
+        targetType: "review_nudge_task",
+        targetId: String(updated.id),
+        beforeJson: { status: task.status },
+        afterJson: { status: updated.status, action }
+      }
+    });
+
+    return {
+      id: updated.id,
+      level: updated.level,
+      status: updated.status,
+      channel: updated.channel,
+      targetCount: updated.targetCount,
+      message: updated.message,
+      createdAt: updated.createdAt
+    };
+  }
 }

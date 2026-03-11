@@ -98,6 +98,18 @@ export class ReportsController {
     });
   }
 
+  @Patch("review-nudges/:id")
+  updateReviewNudgeTask(
+    @Req() request: Request,
+    @Param("id", ParseIntPipe) id: number,
+    @Body()
+    body: {
+      action: "markSent" | "markFailed" | "retry";
+    }
+  ) {
+    return this.reportsService.updateReviewNudgeTask((request as UserRequest).user, id, body.action);
+  }
+
   @Get(":id/timeline")
   reviewTimeline(@Req() request: Request, @Param("id", ParseIntPipe) id: number) {
     return this.reportsService.reviewTimeline(id, (request as UserRequest).user);

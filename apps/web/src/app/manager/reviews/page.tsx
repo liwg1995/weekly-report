@@ -61,6 +61,7 @@ type ReviewNudgeItem = {
   targetCount: number;
   message: string;
   createdAt: string;
+  updatedAt?: string;
 };
 
 type ExportColumn = "time" | "actor" | "action" | "targetId";
@@ -469,6 +470,21 @@ export default function ManagerReviewsPage() {
       setReviewNudges(data.items ?? []);
     } catch {
       // Ignore nudge list load failures to avoid blocking review flow.
+    }
+  };
+
+  const updateReviewNudgeStatus = async (
+    id: number,
+    action: "markSent" | "markFailed" | "retry"
+  ) => {
+    try {
+      const updated = await apiPatch<ReviewNudgeItem>(`/api/weekly-reports/review-nudges/${id}`, {
+        action
+      });
+      setNotice(`催办任务 #${updated.id} 状态已更新为 ${updated.status}`);
+      await loadReviewNudges();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "更新催办任务状态失败，请稍后重试。");
     }
   };
 
@@ -2460,16 +2476,45 @@ export default function ManagerReviewsPage() {
               一键催办（占位）
             </button>
           </div>
-          {reviewNudges.length > 0 ? (
-            <div style={{ marginTop: "8px", color: "var(--muted)", fontSize: "12px" }}>
-              最近催办：
-              {reviewNudges.slice(0, 3).map((item) => (
-                <span key={item.id} style={{ marginLeft: "8px" }}>
-                  #{item.id} {item.level} / {item.targetCount}条 / {item.status}
-                </span>
-              ))}
+          <div style={{ marginTop: "8px" }}>
+            <div style={{ color: "var(--muted)", fontSize: "12px", marginBottom: "6px" }}>
+              催办队列（最近5条）
             </div>
-          ) : null}
+            {reviewNudges.length === 0 ? (
+              <div style={{ color: "var(--muted)", fontSize: "12px" }}>暂无催办任务</div>
+            ) : (
+              <ul style={{ listStyle: "none", padding: 0, margin: 0, display: "grid", gap: "6px" }}>
+                {reviewNudges.map((item) => (
+                  <li
+                    key={item.id}
+                    style={{
+                      border: "1px solid var(--border)",
+                      borderRadius: "8px",
+                      padding: "8px",
+                      display: "grid",
+                      gap: "6px"
+                    }}
+                  >
+                    <div style={{ fontSize: "12px" }}>
+                      #{item.id} {item.level} / {item.targetCount}条 / {item.status}
+                    </div>
+                    <div style={{ color: "var(--muted)", fontSize: "12px" }}>{item.message}</div>
+                    <div style={{ display: "flex", gap: "6px", flexWrap: "wrap" }}>
+                      <button type="button" onClick={() => void updateReviewNudgeStatus(item.id, "markSent")}>
+                        标记已发送
+                      </button>
+                      <button type="button" onClick={() => void updateReviewNudgeStatus(item.id, "markFailed")}>
+                        标记失败
+                      </button>
+                      <button type="button" onClick={() => void updateReviewNudgeStatus(item.id, "retry")}>
+                        重试
+                      </button>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
         </section>
       ) : null}
       {!loading && !error && items.length === 0 ? <p>当前没有待审批周报。</p> : null}

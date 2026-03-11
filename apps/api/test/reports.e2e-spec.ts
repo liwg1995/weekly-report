@@ -453,4 +453,39 @@ describe("Reports (e2e)", () => {
     expect(ids).toContain(directReport.body.id);
     expect(ids).not.toContain(nonDirectReport.body.id);
   });
+
+  it("can persist review nudge task and query recent nudge tasks", async () => {
+    const report = await request(app.getHttpServer())
+      .post("/weekly-reports")
+      .set("Authorization", `Bearer ${token}`)
+      .send({
+        cycleId: 19,
+        thisWeekText: "nudge target",
+        nextWeekText: "next",
+        risksText: "",
+        needsHelpText: ""
+      })
+      .expect(201);
+
+    const created = await request(app.getHttpServer())
+      .post("/weekly-reports/review-nudges")
+      .set("Authorization", `Bearer ${token}`)
+      .send({ level: "SLA24", targetReportIds: [report.body.id] })
+      .expect(201);
+
+    expect(created.body.level).toBe("SLA24");
+    expect(created.body.targetCount).toBe(1);
+    expect(created.body.status).toBe("PENDING");
+
+    const recent = await request(app.getHttpServer())
+      .get("/weekly-reports/review-nudges?limit=5")
+      .set("Authorization", `Bearer ${token}`)
+      .expect(200);
+
+    expect(Array.isArray(recent.body.items)).toBe(true);
+    const target = recent.body.items.find((item: { id: number }) => item.id === created.body.id);
+    expect(target).toBeTruthy();
+    expect(target.level).toBe("SLA24");
+    expect(target.targetCount).toBe(1);
+  });
 });

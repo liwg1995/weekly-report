@@ -53,6 +53,16 @@ type AuditItem = {
   actor: { id: number; username: string; realName: string } | null;
 };
 
+type ReviewNudgeItem = {
+  id: number;
+  level: string;
+  status: string;
+  channel: string;
+  targetCount: number;
+  message: string;
+  createdAt: string;
+};
+
 type ExportColumn = "time" | "actor" | "action" | "targetId";
 
 const EXPORT_PREFERENCES_KEY = "manager_reviews_export_preferences";
@@ -359,6 +369,7 @@ export default function ManagerReviewsPage() {
   const [rejectTargetIds, setRejectTargetIds] = useState<number[]>([]);
   const [rejectReason, setRejectReason] = useState("");
   const [logs, setLogs] = useState<AuditItem[]>([]);
+  const [reviewNudges, setReviewNudges] = useState<ReviewNudgeItem[]>([]);
   const [logDecision, setLogDecision] = useState<"all" | "APPROVED" | "REJECTED">("all");
   const [logActorKeyword, setLogActorKeyword] = useState("");
   const [logDateFrom, setLogDateFrom] = useState("");
@@ -449,6 +460,15 @@ export default function ManagerReviewsPage() {
       setLogs(data.items);
     } catch {
       // Ignore audit log load failures to avoid blocking review flow.
+    }
+  };
+
+  const loadReviewNudges = async () => {
+    try {
+      const data = await apiGet<{ items: ReviewNudgeItem[] }>("/api/weekly-reports/review-nudges?limit=5");
+      setReviewNudges(data.items ?? []);
+    } catch {
+      // Ignore nudge list load failures to avoid blocking review flow.
     }
   };
 
@@ -1727,13 +1747,19 @@ export default function ManagerReviewsPage() {
     setNotice(`已定位 ${targetIds.length} 条${label}待办，请优先处理。`);
     focusPendingList();
   };
-  const triggerSlaNudgePlaceholder = () => {
-    const targetCount = sla24Items.length;
-    setNotice(
-      targetCount > 0
-        ? `催办占位已触发：超24h待办 ${targetCount} 条（企业微信/钉钉提醒待接入）。`
-        : "催办占位已触发：当前无超24h待办。"
-    );
+  const triggerSlaNudgePlaceholder = async () => {
+    try {
+      const result = await apiPost<ReviewNudgeItem>("/api/weekly-reports/review-nudges", {
+        level: "SLA24",
+        targetReportIds: sla24Items.map((item) => item.id)
+      });
+      setNotice(
+        `催办任务已创建：超24h待办 ${result.targetCount} 条（企业微信/钉钉提醒待接入）。`
+      );
+      await loadReviewNudges();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "创建催办任务失败，请稍后重试。");
+    }
   };
 
   return (
@@ -2430,10 +2456,20 @@ export default function ManagerReviewsPage() {
             <button type="button" onClick={() => focusSlaItems(sla48Items.map((item) => item.id), "超48h")}>
               一键定位超48h
             </button>
-            <button type="button" onClick={triggerSlaNudgePlaceholder}>
+            <button type="button" onClick={() => void triggerSlaNudgePlaceholder()}>
               一键催办（占位）
             </button>
           </div>
+          {reviewNudges.length > 0 ? (
+            <div style={{ marginTop: "8px", color: "var(--muted)", fontSize: "12px" }}>
+              最近催办：
+              {reviewNudges.slice(0, 3).map((item) => (
+                <span key={item.id} style={{ marginLeft: "8px" }}>
+                  #{item.id} {item.level} / {item.targetCount}条 / {item.status}
+                </span>
+              ))}
+            </div>
+          ) : null}
         </section>
       ) : null}
       {!loading && !error && items.length === 0 ? <p>当前没有待审批周报。</p> : null}

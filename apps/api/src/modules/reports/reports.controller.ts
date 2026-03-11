@@ -79,6 +79,25 @@ export class ReportsController {
     return this.reportsService.myFeedback((request as UserRequest).user.id);
   }
 
+  @Post("review-nudges")
+  createReviewNudgeTask(
+    @Req() request: Request,
+    @Body()
+    body: {
+      level: "SLA24" | "SLA48";
+      targetReportIds?: number[];
+    }
+  ) {
+    return this.reportsService.createReviewNudgeTask((request as UserRequest).user, body);
+  }
+
+  @Get("review-nudges")
+  reviewNudgeTasks(@Req() request: Request, @Query("limit") limit?: string) {
+    return this.reportsService.listReviewNudgeTasks((request as UserRequest).user, {
+      limit: limit ? Number(limit) : undefined
+    });
+  }
+
   @Get(":id/timeline")
   reviewTimeline(@Req() request: Request, @Param("id", ParseIntPipe) id: number) {
     return this.reportsService.reviewTimeline(id, (request as UserRequest).user);

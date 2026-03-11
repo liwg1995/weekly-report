@@ -984,6 +984,36 @@ describe("ManagerReviewsPage", () => {
         ok: true,
         status: 200,
         json: async () => ({ items: [] })
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 201,
+        json: async () => ({
+          id: 8801,
+          level: "SLA24",
+          status: "PENDING",
+          channel: "LOCAL_PLACEHOLDER",
+          targetCount: 2,
+          message: "超24h未处理催办任务，涉及 2 条周报",
+          createdAt: "2026-03-11T08:00:00.000Z"
+        })
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => ({
+          items: [
+            {
+              id: 8801,
+              level: "SLA24",
+              status: "PENDING",
+              channel: "LOCAL_PLACEHOLDER",
+              targetCount: 2,
+              message: "超24h未处理催办任务，涉及 2 条周报",
+              createdAt: "2026-03-11T08:00:00.000Z"
+            }
+          ]
+        })
       });
     globalThis.fetch = fetchMock as typeof fetch;
 
@@ -1002,8 +1032,10 @@ describe("ManagerReviewsPage", () => {
     fireEvent.click(screen.getByRole("button", { name: "一键催办（占位）" }));
     await waitFor(() => {
       expect(
-        screen.getByText("催办占位已触发：超24h待办 2 条（企业微信/钉钉提醒待接入）。")
+        screen.getByText("催办任务已创建：超24h待办 2 条（企业微信/钉钉提醒待接入）。")
       ).toBeInTheDocument();
+      expect(screen.getByText("最近催办：")).toBeInTheDocument();
+      expect(screen.getByText("#8801 SLA24 / 2条 / PENDING")).toBeInTheDocument();
     });
   });
 

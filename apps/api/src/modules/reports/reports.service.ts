@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from "@nestjs/common";
+import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from "@nestjs/common";
 import { CycleStatus, Prisma, ReportStatus } from "@prisma/client";
 import { PrismaService } from "../prisma/prisma.service";
 import { AuthUser } from "../auth/auth.service";
@@ -6,6 +6,15 @@ import { AuthUser } from "../auth/auth.service";
 @Injectable()
 export class ReportsService {
   constructor(private readonly prisma: PrismaService) {}
+
+  private ensureCanManageReviews(user: AuthUser) {
+    const allowed = user.roles.some((role) =>
+      ["SUPER_ADMIN", "DEPT_ADMIN", "MANAGER", "LEADER"].includes(role)
+    );
+    if (!allowed) {
+      throw new ForbiddenException("你当前没有审批权限，请联系管理员分配角色。");
+    }
+  }
 
   private async buildRoleWheres(user: AuthUser): Promise<Prisma.WeeklyReportWhereInput[]> {
     const roleWheres: Prisma.WeeklyReportWhereInput[] = [];
@@ -398,6 +407,84 @@ export class ReportsService {
         comment: item.comment,
         createdAt: item.createdAt,
         reviewer: item.reviewer
+      }))
+    };
+  }
+
+  async createReviewNudgeTask(
+    user: AuthUser,
+    input: {
+      level: "SLA24" | "SLA48";
+      targetReportIds?: number[];
+    }
+  ) {
+    this.ensureCanManageReviews(user);
+    const level = input.level;
+    if (!["SLA24", "SLA48"].includes(level)) {
+      throw new BadRequestException("不支持的催办级别");
+    }
+    const normalizedIds = [...new Set((input.targetReportIds ?? []).filter((id) => Number.isInteger(id) && id > 0))]
+      .slice(0, 200);
+    const message =
+      level === "SLA48"
+        ? `超48h未处理催办任务，涉及 ${normalizedIds.length} 条周报`
+        : `超24h未处理催办任务，涉及 ${normalizedIds.length} 条周报`;
+
+    const created = await this.prisma.reviewNudgeTask.create({
+      data: {
+        creatorUserId: user.id,
+        level,
+        status: "PENDING",
+        channel: "LOCAL_PLACEHOLDER",
+        message,
+        targetCount: normalizedIds.length,
+        targetIdsJson: normalizedIds
+      }
+    });
+
+    await this.prisma.auditLog.create({
+      data: {
+        actorUserId: user.id,
+        action: "REVIEW_NUDGE_CREATED",
+        targetType: "review_nudge_task",
+        targetId: String(created.id),
+        afterJson: {
+          level: created.level,
+          targetCount: created.targetCount,
+          channel: created.channel,
+          status: created.status
+        }
+      }
+    });
+
+    return {
+      id: created.id,
+      level: created.level,
+      status: created.status,
+      channel: created.channel,
+      targetCount: created.targetCount,
+      message: created.message,
+      createdAt: created.createdAt
+    };
+  }
+
+  async listReviewNudgeTasks(user: AuthUser, query?: { limit?: number }) {
+    this.ensureCanManageReviews(user);
+    const limit = Math.min(20, Math.max(1, query?.limit ?? 5));
+    const items = await this.prisma.reviewNudgeTask.findMany({
+      where: { creatorUserId: user.id },
+      orderBy: { id: "desc" },
+      take: limit
+    });
+    return {
+      items: items.map((item) => ({
+        id: item.id,
+        level: item.level,
+        status: item.status,
+        channel: item.channel,
+        targetCount: item.targetCount,
+        message: item.message,
+        createdAt: item.createdAt
       }))
     };
   }

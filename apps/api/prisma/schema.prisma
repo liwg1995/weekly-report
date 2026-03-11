@@ -51,12 +51,30 @@ model User {
   userDepartments UserDepartment[]
   reports         WeeklyReport[]
   reviews         ReportReview[]
+  reviewNudgeTasks ReviewNudgeTask[]
   audits          AuditLog[]
   importJobs      ImportJob[]
   reviewExportTemplates ReviewExportTemplate[]
   createdAt       DateTime         @default(now()) @map("created_at")
 
   @@map("users")
+}
+
+model ReviewNudgeTask {
+  id           Int      @id @default(autoincrement())
+  creatorUserId Int     @map("creator_user_id")
+  level        String   @db.VarChar(32)
+  status       String   @default("PENDING") @db.VarChar(32)
+  channel      String   @default("LOCAL_PLACEHOLDER") @db.VarChar(32)
+  message      String   @db.VarChar(255)
+  targetCount  Int      @default(0) @map("target_count")
+  targetIdsJson Json?   @map("target_ids_json")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+  creator      User     @relation(fields: [creatorUserId], references: [id])
+
+  @@index([creatorUserId, createdAt])
+  @@map("review_nudge_tasks")
 }
 
 model Department {

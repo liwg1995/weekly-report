@@ -741,7 +741,7 @@ describe("ManagerReviewsPage", () => {
 
     render(<ManagerReviewsPage />);
     await waitFor(() => {
-      expect(screen.getByText("提醒优先")).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "提醒优先排序" })).toBeInTheDocument();
     });
 
     fireEvent.click(screen.getByRole("button", { name: "提醒优先排序" }));
@@ -794,6 +794,95 @@ describe("ManagerReviewsPage", () => {
     await waitFor(() => {
       expect(fetchMock).toHaveBeenCalledWith(
         "/api/weekly-reports?status=PENDING_APPROVAL&page=1&pageSize=20&myDirectOnly=true",
+        expect.objectContaining({ method: "GET" })
+      );
+    });
+  });
+
+  it("supports sort selector query for mention-first and overdue-first", async () => {
+    const fetchMock = jest.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        items: [{ id: 1701, thisWeekText: "排序验证", status: "PENDING_APPROVAL" }],
+        total: 1,
+        page: 1,
+        pageSize: 20
+      })
+    });
+    globalThis.fetch = fetchMock as typeof fetch;
+
+    render(<ManagerReviewsPage />);
+    await waitFor(() => {
+      expect(screen.getByText("排序验证")).toBeInTheDocument();
+    });
+
+    fireEvent.change(screen.getByLabelText("审批排序"), { target: { value: "mentionFirst" } });
+    await waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledWith(
+        "/api/weekly-reports?status=PENDING_APPROVAL&page=1&pageSize=20&mentionFirst=true",
+        expect.objectContaining({ method: "GET" })
+      );
+    });
+
+    fireEvent.change(screen.getByLabelText("审批排序"), { target: { value: "overdueFirst" } });
+    await waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledWith(
+        "/api/weekly-reports?status=PENDING_APPROVAL&page=1&pageSize=20&overdueFirst=true",
+        expect.objectContaining({ method: "GET" })
+      );
+    });
+  });
+
+  it("supports my-pending preset quick filter query", async () => {
+    const fetchMock = jest.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        items: [{ id: 1702, thisWeekText: "预设-待我审批", status: "PENDING_APPROVAL" }],
+        total: 1,
+        page: 1,
+        pageSize: 20
+      })
+    });
+    globalThis.fetch = fetchMock as typeof fetch;
+
+    render(<ManagerReviewsPage />);
+    await waitFor(() => {
+      expect(screen.getByText("预设-待我审批")).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "待我审批预设" }));
+    await waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledWith(
+        "/api/weekly-reports?status=PENDING_APPROVAL&page=1&pageSize=20&mentionFirst=true&myDirectOnly=true",
+        expect.objectContaining({ method: "GET" })
+      );
+    });
+  });
+
+  it("supports mention-priority preset quick filter query", async () => {
+    const fetchMock = jest.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        items: [{ id: 1703, thisWeekText: "预设-提醒优先", status: "PENDING_APPROVAL" }],
+        total: 1,
+        page: 1,
+        pageSize: 20
+      })
+    });
+    globalThis.fetch = fetchMock as typeof fetch;
+
+    render(<ManagerReviewsPage />);
+    await waitFor(() => {
+      expect(screen.getByText("预设-提醒优先")).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "@提醒优先预设" }));
+    await waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledWith(
+        "/api/weekly-reports?status=PENDING_APPROVAL&page=1&pageSize=20&mentionLeaderOnly=true&mentionFirst=true",
         expect.objectContaining({ method: "GET" })
       );
     });

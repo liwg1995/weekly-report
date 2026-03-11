@@ -122,6 +122,18 @@ type ListFilterDefaults = {
   myDirectOnly: boolean;
 };
 
+type ReviewSortMode = "default" | "mentionFirst" | "overdueFirst";
+
+const deriveSortMode = (overdueFirst: boolean, mentionFirst: boolean): ReviewSortMode => {
+  if (overdueFirst) {
+    return "overdueFirst";
+  }
+  if (mentionFirst) {
+    return "mentionFirst";
+  }
+  return "default";
+};
+
 const formatDecisionLabel = (decision?: "all" | "APPROVED" | "REJECTED") => {
   if (decision === "APPROVED") {
     return "仅通过";
@@ -324,6 +336,9 @@ export default function ManagerReviewsPage() {
     savedListDefaults.mentionLeaderOnly
   );
   const [listMentionFirst, setListMentionFirst] = useState(savedListDefaults.mentionFirst);
+  const [listSortMode, setListSortMode] = useState<ReviewSortMode>(() =>
+    deriveSortMode(savedListDefaults.overdueFirst, savedListDefaults.mentionFirst)
+  );
   const [listMyDirectOnly, setListMyDirectOnly] = useState(savedListDefaults.myDirectOnly);
   const [filterDepartments, setFilterDepartments] = useState<Array<{ id: number; name: string }>>(
     () => cachedFilterOptions.departments
@@ -1803,7 +1818,11 @@ export default function ManagerReviewsPage() {
               type="checkbox"
               aria-label="逾期优先"
               checked={listOverdueFirst}
-              onChange={(event) => setListOverdueFirst(event.target.checked)}
+              onChange={(event) => {
+                const checked = event.target.checked;
+                setListOverdueFirst(checked);
+                setListSortMode(checked ? "overdueFirst" : deriveSortMode(false, listMentionFirst));
+              }}
             />{" "}
             逾期优先
           </label>
@@ -1821,7 +1840,11 @@ export default function ManagerReviewsPage() {
               type="checkbox"
               aria-label="提醒优先"
               checked={listMentionFirst}
-              onChange={(event) => setListMentionFirst(event.target.checked)}
+              onChange={(event) => {
+                const checked = event.target.checked;
+                setListMentionFirst(checked);
+                setListSortMode(deriveSortMode(listOverdueFirst, checked));
+              }}
             />{" "}
             提醒优先
           </label>
@@ -1834,10 +1857,83 @@ export default function ManagerReviewsPage() {
             />{" "}
             仅我直属团队
           </label>
+          <select
+            aria-label="审批排序"
+            value={listSortMode}
+            onChange={(event) => {
+              const nextMode = event.target.value as ReviewSortMode;
+              const nextOverdueFirst = nextMode === "overdueFirst";
+              const nextMentionFirst = nextMode === "mentionFirst";
+              setListSortMode(nextMode);
+              setListOverdueFirst(nextOverdueFirst);
+              setListMentionFirst(nextMentionFirst);
+              void loadPendingReports({
+                page: 1,
+                pageSize: listPageSize,
+                keyword: listKeywordInput.trim(),
+                departmentId: listDepartmentId,
+                leaderUserId: listLeaderUserId,
+                overdueFirst: nextOverdueFirst,
+                mentionLeaderOnly: listMentionLeaderOnly,
+                mentionFirst: nextMentionFirst,
+                myDirectOnly: listMyDirectOnly
+              });
+            }}
+          >
+            <option value="default">默认顺序</option>
+            <option value="mentionFirst">提醒优先</option>
+            <option value="overdueFirst">逾期优先</option>
+          </select>
+          <button
+            type="button"
+            onClick={() => {
+              setListSortMode("mentionFirst");
+              setListOverdueFirst(false);
+              setListMentionLeaderOnly(false);
+              setListMentionFirst(true);
+              setListMyDirectOnly(true);
+              void loadPendingReports({
+                page: 1,
+                pageSize: listPageSize,
+                keyword: listKeywordInput.trim(),
+                departmentId: listDepartmentId,
+                leaderUserId: listLeaderUserId,
+                overdueFirst: false,
+                mentionLeaderOnly: false,
+                mentionFirst: true,
+                myDirectOnly: true
+              });
+            }}
+          >
+            待我审批预设
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setListSortMode("mentionFirst");
+              setListOverdueFirst(false);
+              setListMentionLeaderOnly(true);
+              setListMentionFirst(true);
+              void loadPendingReports({
+                page: 1,
+                pageSize: listPageSize,
+                keyword: listKeywordInput.trim(),
+                departmentId: listDepartmentId,
+                leaderUserId: listLeaderUserId,
+                overdueFirst: false,
+                mentionLeaderOnly: true,
+                mentionFirst: true,
+                myDirectOnly: listMyDirectOnly
+              });
+            }}
+          >
+            @提醒优先预设
+          </button>
           <button
             type="button"
             onClick={() => {
               setListOverdueFirst(true);
+              setListSortMode("overdueFirst");
               void loadPendingReports({
                 page: 1,
                 pageSize: listPageSize,
@@ -1876,6 +1972,7 @@ export default function ManagerReviewsPage() {
             type="button"
             onClick={() => {
               setListMentionFirst(true);
+              setListSortMode("mentionFirst");
               void loadPendingReports({
                 page: 1,
                 pageSize: listPageSize,
@@ -1960,6 +2057,7 @@ export default function ManagerReviewsPage() {
               setListOverdueFirst(next.overdueFirst);
               setListMentionLeaderOnly(next.mentionLeaderOnly);
               setListMentionFirst(next.mentionFirst);
+              setListSortMode(deriveSortMode(next.overdueFirst, next.mentionFirst));
               setListMyDirectOnly(next.myDirectOnly);
               void loadPendingReports({
                 page: 1,
@@ -1986,6 +2084,7 @@ export default function ManagerReviewsPage() {
               setListOverdueFirst(false);
               setListMentionLeaderOnly(false);
               setListMentionFirst(false);
+              setListSortMode("default");
               setListMyDirectOnly(false);
               void loadPendingReports({
                 page: 1,
@@ -2174,6 +2273,7 @@ export default function ManagerReviewsPage() {
                 setListOverdueFirst(false);
                 setListMentionLeaderOnly(false);
                 setListMentionFirst(false);
+                setListSortMode("default");
                 setListMyDirectOnly(false);
                 void loadPendingReports({
                   page: 1,

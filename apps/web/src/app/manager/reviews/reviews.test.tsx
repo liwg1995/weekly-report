@@ -944,6 +944,69 @@ describe("ManagerReviewsPage", () => {
     });
   });
 
+  it("shows sla reminders and supports nudge placeholder actions", async () => {
+    const now = Date.now();
+    const due26h = new Date(now - 26 * 60 * 60 * 1000).toISOString();
+    const due50h = new Date(now - 50 * 60 * 60 * 1000).toISOString();
+    const fetchMock = jest
+      .fn()
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => ({
+          items: [
+            {
+              id: 1721,
+              thisWeekText: "超24h",
+              status: "PENDING_APPROVAL",
+              isOverdue: true,
+              dueAt: due26h
+            },
+            {
+              id: 1722,
+              thisWeekText: "超48h",
+              status: "PENDING_APPROVAL",
+              isOverdue: true,
+              dueAt: due50h
+            },
+            {
+              id: 1723,
+              thisWeekText: "普通",
+              status: "PENDING_APPROVAL"
+            }
+          ],
+          total: 3,
+          page: 1,
+          pageSize: 20
+        })
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => ({ items: [] })
+      });
+    globalThis.fetch = fetchMock as typeof fetch;
+
+    render(<ManagerReviewsPage />);
+    await waitFor(() => {
+      expect(screen.getByText("超24h未处理：2")).toBeInTheDocument();
+      expect(screen.getByText("超48h未处理：1")).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "一键定位超48h" }));
+    await waitFor(() => {
+      expect(screen.getByText("已定位 1 条超48h待办，请优先处理。")).toBeInTheDocument();
+    });
+    expect((screen.getByLabelText("选择周报-1722") as HTMLInputElement).checked).toBe(true);
+
+    fireEvent.click(screen.getByRole("button", { name: "一键催办（占位）" }));
+    await waitFor(() => {
+      expect(
+        screen.getByText("催办占位已触发：超24h待办 2 条（企业微信/钉钉提醒待接入）。")
+      ).toBeInTheDocument();
+    });
+  });
+
   it("applies saved default list filters on initial load", async () => {
     window.localStorage.setItem(
       "manager_reviews_list_filter_defaults_v1",

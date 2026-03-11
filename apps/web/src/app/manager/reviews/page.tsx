@@ -1668,6 +1668,22 @@ export default function ManagerReviewsPage() {
   const overdueTodoCount = items.filter((item) => item.isOverdue).length;
   const mentionTodoCount = items.filter((item) => item.mentionLeader).length;
   const normalTodoCount = items.filter((item) => !item.isOverdue && !item.mentionLeader).length;
+  const overdueHours = (item: ReviewItem) => {
+    if (!item.dueAt) {
+      return 0;
+    }
+    const dueTs = new Date(item.dueAt).getTime();
+    if (!Number.isFinite(dueTs)) {
+      return 0;
+    }
+    const diffMs = Date.now() - dueTs;
+    if (diffMs <= 0) {
+      return 0;
+    }
+    return diffMs / (1000 * 60 * 60);
+  };
+  const sla24Items = items.filter((item) => overdueHours(item) >= 24);
+  const sla48Items = items.filter((item) => overdueHours(item) >= 48);
   const focusPendingList = () => {
     if (typeof document === "undefined") {
       return;
@@ -1700,6 +1716,24 @@ export default function ManagerReviewsPage() {
       myDirectOnly: options.myDirectOnly
     });
     focusPendingList();
+  };
+  const focusSlaItems = (targetIds: number[], label: string) => {
+    if (targetIds.length === 0) {
+      setNotice(`当前没有${label}待办。`);
+      focusPendingList();
+      return;
+    }
+    setSelectedIds(targetIds);
+    setNotice(`已定位 ${targetIds.length} 条${label}待办，请优先处理。`);
+    focusPendingList();
+  };
+  const triggerSlaNudgePlaceholder = () => {
+    const targetCount = sla24Items.length;
+    setNotice(
+      targetCount > 0
+        ? `催办占位已触发：超24h待办 ${targetCount} 条（企业微信/钉钉提醒待接入）。`
+        : "催办占位已触发：当前无超24h待办。"
+    );
   };
 
   return (
@@ -2346,6 +2380,8 @@ export default function ManagerReviewsPage() {
             <span>逾期待办：{overdueTodoCount}</span>
             <span>@提醒待办：{mentionTodoCount}</span>
             <span>普通待办：{normalTodoCount}</span>
+            <span>超24h未处理：{sla24Items.length}</span>
+            <span>超48h未处理：{sla48Items.length}</span>
             <span>当前页总数：{items.length}</span>
           </div>
           <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
@@ -2387,6 +2423,15 @@ export default function ManagerReviewsPage() {
               }
             >
               一键处理普通
+            </button>
+            <button type="button" onClick={() => focusSlaItems(sla24Items.map((item) => item.id), "超24h")}>
+              一键定位超24h
+            </button>
+            <button type="button" onClick={() => focusSlaItems(sla48Items.map((item) => item.id), "超48h")}>
+              一键定位超48h
+            </button>
+            <button type="button" onClick={triggerSlaNudgePlaceholder}>
+              一键催办（占位）
             </button>
           </div>
         </section>

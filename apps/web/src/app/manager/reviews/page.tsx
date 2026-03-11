@@ -58,6 +58,7 @@ type ExportColumn = "time" | "actor" | "action" | "targetId";
 const EXPORT_PREFERENCES_KEY = "manager_reviews_export_preferences";
 const EXPORT_HISTORY_KEY = "manager_reviews_export_history";
 const FILTER_OPTIONS_CACHE_KEY = "manager_reviews_filter_options_cache_v1";
+const LIST_FILTER_DEFAULTS_KEY = "manager_reviews_list_filter_defaults_v1";
 const FILTER_OPTIONS_CACHE_TTL_MS = 5 * 60 * 1000;
 const EXPORT_HISTORY_PAGE_SIZE = 5;
 const DEFAULT_EXPORT_COLUMNS: Record<ExportColumn, boolean> = {
@@ -108,6 +109,17 @@ type TemplateVersion = {
   filters: ExportTemplate["filters"];
   columns: ExportTemplate["columns"];
   encoding: "utf-8" | "gbk";
+};
+
+type ListFilterDefaults = {
+  pageSize: number;
+  keyword: string;
+  departmentId?: number;
+  leaderUserId?: number;
+  overdueFirst: boolean;
+  mentionLeaderOnly: boolean;
+  mentionFirst: boolean;
+  myDirectOnly: boolean;
 };
 
 const formatDecisionLabel = (decision?: "all" | "APPROVED" | "REJECTED") => {
@@ -248,20 +260,71 @@ const readFilterOptionsCache = (): CachedFilterOptions => {
   }
 };
 
+const readListFilterDefaults = (): ListFilterDefaults => {
+  const fallback: ListFilterDefaults = {
+    pageSize: 20,
+    keyword: "",
+    departmentId: undefined,
+    leaderUserId: undefined,
+    overdueFirst: false,
+    mentionLeaderOnly: false,
+    mentionFirst: false,
+    myDirectOnly: false
+  };
+  if (typeof window === "undefined") {
+    return fallback;
+  }
+  try {
+    const raw = window.localStorage.getItem(LIST_FILTER_DEFAULTS_KEY);
+    if (!raw) {
+      return fallback;
+    }
+    const parsed = JSON.parse(raw) as Partial<ListFilterDefaults>;
+    const pageSize = Number(parsed.pageSize ?? 20);
+    return {
+      pageSize: Number.isFinite(pageSize) ? Math.min(100, Math.max(10, pageSize)) : 20,
+      keyword: String(parsed.keyword ?? ""),
+      departmentId:
+        typeof parsed.departmentId === "number" && Number.isFinite(parsed.departmentId)
+          ? parsed.departmentId
+          : undefined,
+      leaderUserId:
+        typeof parsed.leaderUserId === "number" && Number.isFinite(parsed.leaderUserId)
+          ? parsed.leaderUserId
+          : undefined,
+      overdueFirst: Boolean(parsed.overdueFirst),
+      mentionLeaderOnly: Boolean(parsed.mentionLeaderOnly),
+      mentionFirst: Boolean(parsed.mentionFirst),
+      myDirectOnly: Boolean(parsed.myDirectOnly)
+    };
+  } catch {
+    return fallback;
+  }
+};
+
 export default function ManagerReviewsPage() {
   const [cachedFilterOptions] = useState<CachedFilterOptions>(() => readFilterOptionsCache());
+  const [savedListDefaults, setSavedListDefaults] = useState<ListFilterDefaults>(() =>
+    readListFilterDefaults()
+  );
   const [items, setItems] = useState<ReviewItem[]>([]);
   const [totalItems, setTotalItems] = useState(0);
   const [listPage, setListPage] = useState(1);
-  const [listPageSize, setListPageSize] = useState(20);
-  const [listKeywordInput, setListKeywordInput] = useState("");
-  const [listKeyword, setListKeyword] = useState("");
-  const [listDepartmentId, setListDepartmentId] = useState<number | undefined>(undefined);
-  const [listLeaderUserId, setListLeaderUserId] = useState<number | undefined>(undefined);
-  const [listOverdueFirst, setListOverdueFirst] = useState(false);
-  const [listMentionLeaderOnly, setListMentionLeaderOnly] = useState(false);
-  const [listMentionFirst, setListMentionFirst] = useState(false);
-  const [listMyDirectOnly, setListMyDirectOnly] = useState(false);
+  const [listPageSize, setListPageSize] = useState(savedListDefaults.pageSize);
+  const [listKeywordInput, setListKeywordInput] = useState(savedListDefaults.keyword);
+  const [listKeyword, setListKeyword] = useState(savedListDefaults.keyword);
+  const [listDepartmentId, setListDepartmentId] = useState<number | undefined>(
+    savedListDefaults.departmentId
+  );
+  const [listLeaderUserId, setListLeaderUserId] = useState<number | undefined>(
+    savedListDefaults.leaderUserId
+  );
+  const [listOverdueFirst, setListOverdueFirst] = useState(savedListDefaults.overdueFirst);
+  const [listMentionLeaderOnly, setListMentionLeaderOnly] = useState(
+    savedListDefaults.mentionLeaderOnly
+  );
+  const [listMentionFirst, setListMentionFirst] = useState(savedListDefaults.mentionFirst);
+  const [listMyDirectOnly, setListMyDirectOnly] = useState(savedListDefaults.myDirectOnly);
   const [filterDepartments, setFilterDepartments] = useState<Array<{ id: number; name: string }>>(
     () => cachedFilterOptions.departments
   );
@@ -716,6 +779,13 @@ export default function ManagerReviewsPage() {
   };
 
   const toCsvCell = (value: string) => `"${value.replace(/"/g, '""')}"`;
+
+  const persistListDefaults = (next: ListFilterDefaults) => {
+    if (typeof window !== "undefined") {
+      window.localStorage.setItem(LIST_FILTER_DEFAULTS_KEY, JSON.stringify(next));
+    }
+    setSavedListDefaults(next);
+  };
 
   const applyExportPreset = (preset: "retro" | "audit") => {
     if (preset === "retro") {
@@ -1863,6 +1933,52 @@ export default function ManagerReviewsPage() {
           <button
             type="button"
             onClick={() => {
+              persistListDefaults({
+                pageSize: listPageSize,
+                keyword: listKeywordInput.trim(),
+                departmentId: listDepartmentId,
+                leaderUserId: listLeaderUserId,
+                overdueFirst: listOverdueFirst,
+                mentionLeaderOnly: listMentionLeaderOnly,
+                mentionFirst: listMentionFirst,
+                myDirectOnly: listMyDirectOnly
+              });
+              setNotice("已保存为默认筛选");
+            }}
+          >
+            保存为默认筛选
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              const next = readListFilterDefaults();
+              setListPageSize(next.pageSize);
+              setListKeywordInput(next.keyword);
+              setListKeyword(next.keyword);
+              setListDepartmentId(next.departmentId);
+              setListLeaderUserId(next.leaderUserId);
+              setListOverdueFirst(next.overdueFirst);
+              setListMentionLeaderOnly(next.mentionLeaderOnly);
+              setListMentionFirst(next.mentionFirst);
+              setListMyDirectOnly(next.myDirectOnly);
+              void loadPendingReports({
+                page: 1,
+                pageSize: next.pageSize,
+                keyword: next.keyword,
+                departmentId: next.departmentId,
+                leaderUserId: next.leaderUserId,
+                overdueFirst: next.overdueFirst,
+                mentionLeaderOnly: next.mentionLeaderOnly,
+                mentionFirst: next.mentionFirst,
+                myDirectOnly: next.myDirectOnly
+              });
+            }}
+          >
+            恢复默认筛选
+          </button>
+          <button
+            type="button"
+            onClick={() => {
               setListKeywordInput("");
               setListKeyword("");
               setListDepartmentId(undefined);
@@ -1888,6 +2004,9 @@ export default function ManagerReviewsPage() {
           </button>
           <span style={{ color: "var(--muted)", fontSize: "12px" }}>
             第 {listPage} / {listTotalPages} 页，显示 {listStart}-{listEnd} / {totalItems}
+          </span>
+          <span style={{ color: "var(--muted)", fontSize: "12px" }}>
+            默认：{savedListDefaults.pageSize}条
           </span>
         </div>
         {activeFilterTags.length > 0 ? (

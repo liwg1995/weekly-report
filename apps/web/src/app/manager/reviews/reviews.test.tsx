@@ -799,6 +799,103 @@ describe("ManagerReviewsPage", () => {
     });
   });
 
+  it("applies saved default list filters on initial load", async () => {
+    window.localStorage.setItem(
+      "manager_reviews_list_filter_defaults_v1",
+      JSON.stringify({
+        pageSize: 50,
+        overdueFirst: true,
+        mentionLeaderOnly: true,
+        mentionFirst: true,
+        myDirectOnly: true
+      })
+    );
+
+    const fetchMock = jest
+      .fn()
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => ({
+          items: [{ id: 959, thisWeekText: "默认筛选命中", status: "PENDING_APPROVAL" }],
+          total: 1,
+          page: 1,
+          pageSize: 50
+        })
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => ({ items: [] })
+      });
+    globalThis.fetch = fetchMock as typeof fetch;
+
+    render(<ManagerReviewsPage />);
+
+    await waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledWith(
+        "/api/weekly-reports?status=PENDING_APPROVAL&page=1&pageSize=50&overdueFirst=true&mentionLeaderOnly=true&mentionFirst=true&myDirectOnly=true",
+        expect.objectContaining({ method: "GET" })
+      );
+    });
+  });
+
+  it("can save current filters as defaults and restore them", async () => {
+    const fetchMock = jest
+      .fn()
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => ({
+          items: [{ id: 960, thisWeekText: "保存默认", status: "PENDING_APPROVAL" }],
+          total: 1,
+          page: 1,
+          pageSize: 20
+        })
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => ({ items: [] })
+      })
+      .mockResolvedValue({
+        ok: true,
+        status: 200,
+        json: async () => ({
+          items: [{ id: 960, thisWeekText: "保存默认", status: "PENDING_APPROVAL" }],
+          total: 1,
+          page: 1,
+          pageSize: 20
+        })
+      });
+    globalThis.fetch = fetchMock as typeof fetch;
+
+    render(<ManagerReviewsPage />);
+    await waitFor(() => {
+      expect(screen.getByText("保存默认")).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByRole("checkbox", { name: "逾期优先" }));
+    fireEvent.click(screen.getByRole("checkbox", { name: "@领导提醒" }));
+    fireEvent.click(screen.getByRole("button", { name: "保存为默认筛选" }));
+
+    const savedRaw = window.localStorage.getItem("manager_reviews_list_filter_defaults_v1");
+    expect(savedRaw).toBeTruthy();
+    const saved = JSON.parse(savedRaw || "{}");
+    expect(saved.overdueFirst).toBe(true);
+    expect(saved.mentionLeaderOnly).toBe(true);
+
+    fireEvent.click(screen.getByRole("button", { name: "重置" }));
+    fireEvent.click(screen.getByRole("button", { name: "恢复默认筛选" }));
+
+    await waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledWith(
+        "/api/weekly-reports?status=PENDING_APPROVAL&page=1&pageSize=20&overdueFirst=true&mentionLeaderOnly=true",
+        expect.objectContaining({ method: "GET" })
+      );
+    });
+  });
+
   it("loads filter options and supports active filter tags clear all", async () => {
     const fetchMock = jest
       .fn()

@@ -1665,6 +1665,42 @@ export default function ManagerReviewsPage() {
       hour: "2-digit",
       minute: "2-digit"
     });
+  const overdueTodoCount = items.filter((item) => item.isOverdue).length;
+  const mentionTodoCount = items.filter((item) => item.mentionLeader).length;
+  const normalTodoCount = items.filter((item) => !item.isOverdue && !item.mentionLeader).length;
+  const focusPendingList = () => {
+    if (typeof document === "undefined") {
+      return;
+    }
+    const pendingList = document.getElementById("pending-list");
+    if (pendingList && typeof pendingList.scrollIntoView === "function") {
+      pendingList.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+  };
+  const applyListQuickFilter = (options: {
+    overdueFirst: boolean;
+    mentionLeaderOnly: boolean;
+    mentionFirst: boolean;
+    myDirectOnly: boolean;
+  }) => {
+    setListOverdueFirst(options.overdueFirst);
+    setListMentionLeaderOnly(options.mentionLeaderOnly);
+    setListMentionFirst(options.mentionFirst);
+    setListMyDirectOnly(options.myDirectOnly);
+    setListSortMode(deriveSortMode(options.overdueFirst, options.mentionFirst));
+    void loadPendingReports({
+      page: 1,
+      pageSize: listPageSize,
+      keyword: listKeywordInput.trim(),
+      departmentId: listDepartmentId,
+      leaderUserId: listLeaderUserId,
+      overdueFirst: options.overdueFirst,
+      mentionLeaderOnly: options.mentionLeaderOnly,
+      mentionFirst: options.mentionFirst,
+      myDirectOnly: options.myDirectOnly
+    });
+    focusPendingList();
+  };
 
   return (
     <main className="reviews-page">
@@ -2293,6 +2329,68 @@ export default function ManagerReviewsPage() {
           </div>
         ) : null}
       </section>
+      {!loading && !error ? (
+        <section
+          style={{
+            border: "1px solid var(--border)",
+            borderRadius: "12px",
+            padding: "12px",
+            marginBottom: "12px"
+          }}
+        >
+          <h2 style={{ marginTop: 0, fontSize: "16px" }}>审批效率面板</h2>
+          <p style={{ marginTop: 0, color: "var(--muted)", fontSize: "12px" }}>
+            今日待办分组（按当前筛选结果）
+          </p>
+          <div style={{ display: "flex", gap: "8px", flexWrap: "wrap", marginBottom: "8px" }}>
+            <span>逾期待办：{overdueTodoCount}</span>
+            <span>@提醒待办：{mentionTodoCount}</span>
+            <span>普通待办：{normalTodoCount}</span>
+            <span>当前页总数：{items.length}</span>
+          </div>
+          <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
+            <button
+              type="button"
+              onClick={() =>
+                applyListQuickFilter({
+                  overdueFirst: true,
+                  mentionLeaderOnly: false,
+                  mentionFirst: false,
+                  myDirectOnly: listMyDirectOnly
+                })
+              }
+            >
+              一键处理逾期
+            </button>
+            <button
+              type="button"
+              onClick={() =>
+                applyListQuickFilter({
+                  overdueFirst: false,
+                  mentionLeaderOnly: true,
+                  mentionFirst: true,
+                  myDirectOnly: listMyDirectOnly
+                })
+              }
+            >
+              一键处理@提醒
+            </button>
+            <button
+              type="button"
+              onClick={() =>
+                applyListQuickFilter({
+                  overdueFirst: false,
+                  mentionLeaderOnly: false,
+                  mentionFirst: false,
+                  myDirectOnly: listMyDirectOnly
+                })
+              }
+            >
+              一键处理普通
+            </button>
+          </div>
+        </section>
+      ) : null}
       {!loading && !error && items.length === 0 ? <p>当前没有待审批周报。</p> : null}
       {!loading && !error && items.length > 0 ? (
         <>

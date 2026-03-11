@@ -888,6 +888,62 @@ describe("ManagerReviewsPage", () => {
     });
   });
 
+  it("shows efficiency panel groups and supports one-click handling entry", async () => {
+    const fetchMock = jest
+      .fn()
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => ({
+          items: [
+            { id: 1711, thisWeekText: "逾期待办", status: "PENDING_APPROVAL", isOverdue: true },
+            {
+              id: 1712,
+              thisWeekText: "@提醒待办",
+              status: "PENDING_APPROVAL",
+              mentionLeader: true
+            },
+            { id: 1713, thisWeekText: "普通待办", status: "PENDING_APPROVAL" }
+          ],
+          total: 3,
+          page: 1,
+          pageSize: 20
+        })
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => ({ items: [] })
+      })
+      .mockResolvedValue({
+        ok: true,
+        status: 200,
+        json: async () => ({
+          items: [],
+          total: 0,
+          page: 1,
+          pageSize: 20
+        })
+      });
+    globalThis.fetch = fetchMock as typeof fetch;
+
+    render(<ManagerReviewsPage />);
+    await waitFor(() => {
+      expect(screen.getByText("审批效率面板")).toBeInTheDocument();
+      expect(screen.getByText("逾期待办：1")).toBeInTheDocument();
+      expect(screen.getByText("@提醒待办：1")).toBeInTheDocument();
+      expect(screen.getByText("普通待办：1")).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "一键处理@提醒" }));
+    await waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledWith(
+        "/api/weekly-reports?status=PENDING_APPROVAL&page=1&pageSize=20&mentionLeaderOnly=true&mentionFirst=true",
+        expect.objectContaining({ method: "GET" })
+      );
+    });
+  });
+
   it("applies saved default list filters on initial load", async () => {
     window.localStorage.setItem(
       "manager_reviews_list_filter_defaults_v1",

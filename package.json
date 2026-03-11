@@ -6,6 +6,8 @@
     "test": "pnpm -r test",
     "regression:local": "bash ./scripts/local-regression.sh",
     "release:readiness": "bash ./scripts/release-readiness.sh",
-    "start:local": "bash ./scripts/dev-restart.sh"
+    "start:local": "bash ./scripts/dev-start.sh",
+    "stop:local": "bash ./scripts/dev-stop.sh",
+    "restart:local": "bash ./scripts/dev-restart.sh"
   }
 }

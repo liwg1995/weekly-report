@@ -2,8 +2,11 @@
 
 import { useEffect, useState } from "react";
 import { ApiClientError, apiGet, apiPatch, apiPost } from "../../../lib/api-client";
-import { logoutWithConfirm, requireRole } from "../../../lib/auth-session";
+import AppShell from "../../../components/app-shell";
+import PageHeader from "../../../components/page-header";
+import ResultState from "../../../components/result-state";
 import SessionExpiryNotice from "../../../components/session-expiry-notice";
+import { useAuthGuard } from "../../../lib/use-auth-guard";
 
 type FeedbackItem = {
   reportId: number;
@@ -34,6 +37,10 @@ type MyReportItem = {
 };
 
 export default function EmployeeFeedbackPage() {
+  const guard = useAuthGuard({
+    currentPath: "/employee/feedback",
+    requiredAny: ["feedback:read"]
+  });
   const [items, setItems] = useState<FeedbackItem[]>([]);
   const [myReports, setMyReports] = useState<MyReportItem[]>([]);
   const [timeline, setTimeline] = useState<TimelineItem[]>([]);
@@ -168,12 +175,10 @@ export default function EmployeeFeedbackPage() {
   const rejectedPendingCount = items.filter((item) => item.status === "REJECTED").length;
 
   useEffect(() => {
+    if (!guard.ready) {
+      return;
+    }
     const load = async () => {
-      const allowed = requireRole(["EMPLOYEE"], "/manager/reviews");
-      if (!allowed) {
-        setLoading(false);
-        return;
-      }
       try {
         await loadFeedback();
       } catch (error) {
@@ -195,20 +200,24 @@ export default function EmployeeFeedbackPage() {
       }
     };
     void load();
-  }, []);
+  }, [guard.ready]);
+
+  if (!guard.ready || guard.blocked) {
+    return null;
+  }
 
   return (
-    <main style={{ maxWidth: "980px", margin: "0 auto", padding: "24px" }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-        <h1 style={{ marginTop: 0 }}>审批反馈</h1>
-        <button type="button" onClick={() => logoutWithConfirm()}>
-          退出登录
-        </button>
-      </div>
-      <SessionExpiryNotice />
-      {loading ? <p>加载中...</p> : null}
-      {error ? <p style={{ color: "var(--danger)" }}>{error}</p> : null}
-      {notice ? <p style={{ color: "var(--primary-strong)" }}>{notice}</p> : null}
+    <AppShell
+      workspace="employee-workspace"
+      pageTitle="我的周报"
+      pageDescription="提交周报并查看直属主管审批建议"
+    >
+      <div style={{ maxWidth: "980px", margin: "0 auto" }}>
+        <PageHeader title="审批反馈" subtitle="聚焦本周提交状态与待改进建议。" />
+        <SessionExpiryNotice />
+        {loading ? <p>加载中...</p> : null}
+        {error ? <ResultState type="error" message={error} /> : null}
+        {notice ? <ResultState type="success" message={notice} /> : null}
 
       {!loading && !error ? (
         <section
@@ -449,6 +458,7 @@ export default function EmployeeFeedbackPage() {
           </ol>
         </section>
       ) : null}
-    </main>
+      </div>
+    </AppShell>
   );
 }

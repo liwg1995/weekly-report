@@ -2,6 +2,7 @@
 
 import { useEffect } from "react";
 import { getAccessToken, getSessionUser } from "../lib/auth-session";
+import { getLandingPathForWorkspace, getPreferredWorkspace } from "../lib/authz";
 import { navigateTo } from "../lib/navigation";
 
 export default function HomePage() {
@@ -13,15 +14,8 @@ export default function HomePage() {
       return;
     }
 
-    const isOrgAdmin = sessionUser.roles.some((role) =>
-      ["SUPER_ADMIN", "DEPT_ADMIN"].includes(role)
-    );
-    if (isOrgAdmin) {
-      navigateTo("/manager/org");
-      return;
-    }
-    const isManager = sessionUser.roles.includes("MANAGER");
-    navigateTo(isManager ? "/manager/reviews" : "/employee/feedback");
+    const workspace = getPreferredWorkspace(sessionUser.roles);
+    navigateTo(getLandingPathForWorkspace(workspace));
   }, []);
 
   return <main style={{ padding: "24px" }}>跳转中...</main>;

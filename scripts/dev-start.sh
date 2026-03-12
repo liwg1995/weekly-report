@@ -13,8 +13,12 @@ CORS_ORIGINS="${CORS_ORIGINS:-http://localhost:${WEB_PORT},http://127.0.0.1:${WE
 
 API_PID_FILE="${ROOT_DIR}/.tmp-api-dev.pid"
 WEB_PID_FILE="${ROOT_DIR}/.tmp-web-dev.pid"
-API_LOG_FILE="${ROOT_DIR}/.tmp-api-dev.log"
-WEB_LOG_FILE="${ROOT_DIR}/.tmp-web-dev.log"
+LOG_DIR="${ROOT_DIR}/logs/local-dev"
+LOG_TS="$(date +%Y%m%d-%H%M%S)"
+API_LOG_FILE="${LOG_DIR}/api-${LOG_TS}.log"
+WEB_LOG_FILE="${LOG_DIR}/web-${LOG_TS}.log"
+API_LATEST_LINK="${LOG_DIR}/api-latest.log"
+WEB_LATEST_LINK="${LOG_DIR}/web-latest.log"
 
 log() {
   echo "[local-dev:start] $*"
@@ -84,6 +88,8 @@ start_web() {
 }
 
 main() {
+  mkdir -p "${LOG_DIR}"
+
   if [[ -f "${API_PID_FILE}" ]] && is_pid_running "$(cat "${API_PID_FILE}" 2>/dev/null || true)"; then
     log "检测到 API 已在运行，先执行停止..."
     bash "${ROOT_DIR}/scripts/dev-stop.sh" >/dev/null
@@ -96,11 +102,19 @@ main() {
   start_api
   start_web
 
+  ln -sfn "${API_LOG_FILE}" "${API_LATEST_LINK}"
+  ln -sfn "${WEB_LOG_FILE}" "${WEB_LATEST_LINK}"
+
   log "完成：本地服务已启动"
   log "API: ${API_BASE_URL}"
   log "Web: ${WEB_BASE_URL}"
   log "默认管理员账号: admin / ${ADMIN_PASSWORD:-123456}"
-  log "日志文件: ${API_LOG_FILE} | ${WEB_LOG_FILE}"
+  log "日志文件:"
+  log "  API: ${API_LOG_FILE}"
+  log "  Web: ${WEB_LOG_FILE}"
+  log "最新日志软链:"
+  log "  API: ${API_LATEST_LINK}"
+  log "  Web: ${WEB_LATEST_LINK}"
 }
 
 main "$@"

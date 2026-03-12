@@ -2,7 +2,11 @@
 
 import { useEffect, useState } from "react";
 import { ApiClientError, apiDelete, apiGet, apiPatch, apiPost } from "../../../lib/api-client";
-import { getSessionUser, logoutWithConfirm, requireRole } from "../../../lib/auth-session";
+import { getSessionUser } from "../../../lib/auth-session";
+import AppShell from "../../../components/app-shell";
+import PageHeader from "../../../components/page-header";
+import ResultState from "../../../components/result-state";
+import { useAuthGuard } from "../../../lib/use-auth-guard";
 
 type PerformanceDimension = {
   id: number;
@@ -31,7 +35,10 @@ type PerformanceTodo = {
 };
 
 export default function ManagerPerformancePage() {
-  const [ready, setReady] = useState(false);
+  const guard = useAuthGuard({
+    currentPath: "/manager/performance",
+    requiredAny: ["performance:read"]
+  });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
@@ -86,28 +93,17 @@ export default function ManagerPerformancePage() {
   };
 
   useEffect(() => {
-    const allowed = requireRole(["SUPER_ADMIN", "DEPT_ADMIN", "MANAGER"], "/employee/feedback");
-    if (!allowed) {
+    if (!guard.ready) {
       return;
     }
 
-    let cancelled = false;
-    setReady(true);
-
     const bootstrap = async () => {
-      if (cancelled) {
-        return;
-      }
       await loadOverview();
     };
 
     void bootstrap();
-
-    return () => {
-      cancelled = true;
-    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [guard.ready]);
 
   const canCreateCycle = Boolean(cycleName.trim()) && Boolean(cycleStartDate) && Boolean(cycleEndDate);
   const canCreateDimension = Boolean(dimensionCycleId) && Boolean(dimensionKey.trim()) && Boolean(dimensionName.trim()) && Boolean(dimensionMetricHint.trim());
@@ -293,25 +289,25 @@ export default function ManagerPerformancePage() {
     }
   };
 
-  if (!ready) {
-    return <main style={{ padding: "24px" }}>加载中...</main>;
+  if (!guard.ready || guard.blocked) {
+    return null;
   }
 
   return (
-    <main style={{ padding: "24px", maxWidth: "960px", margin: "0 auto" }}>
-      <header style={{ display: "flex", justifyContent: "space-between", gap: "12px", alignItems: "center" }}>
-        <div>
-          <h1 style={{ margin: 0 }}>绩效考核（占位）</h1>
-          <p style={{ color: "var(--muted)", marginTop: "8px" }}>
-            当前仅实现字段结构与流程占位，后续将与审批建议、周报目标完成度联动。
-          </p>
-        </div>
-        <button type="button" onClick={() => logoutWithConfirm()}>退出登录</button>
-      </header>
+    <AppShell
+      workspace="admin-workspace"
+      pageTitle="绩效配置"
+      pageDescription="支持编辑/删除绩效周期与维度"
+    >
+      <div style={{ padding: "4px 0", maxWidth: "960px", margin: "0 auto" }}>
+        <PageHeader
+          title="绩效考核（占位）"
+          subtitle="当前仅实现字段结构与流程占位，后续将与审批建议、周报目标完成度联动。"
+        />
 
-      {loading ? <p>加载中...</p> : null}
-      {error ? <p style={{ color: "var(--danger)" }}>{error}</p> : null}
-      {notice ? <p style={{ color: "var(--primary-strong)" }}>{notice}</p> : null}
+        {loading ? <p>加载中...</p> : null}
+        {error ? <ResultState type="error" message={error} /> : null}
+        {notice ? <ResultState type="success" message={notice} /> : null}
 
       <section style={{ marginTop: "14px", border: "1px solid var(--border)", borderRadius: "12px", padding: "12px", background: "var(--surface)" }}>
         <h2 style={{ marginTop: 0, fontSize: "16px" }}>配置绩效周期</h2>
@@ -561,6 +557,7 @@ export default function ManagerPerformancePage() {
       <footer style={{ marginTop: "14px", color: "var(--muted)", fontSize: "13px" }}>
         当前用户：{sessionUser?.username ?? "未知"} | 返回审批台：<a href="/manager/reviews">/manager/reviews</a>
       </footer>
-    </main>
+      </div>
+    </AppShell>
   );
 }

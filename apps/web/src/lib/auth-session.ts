@@ -1,6 +1,11 @@
 import { navigateTo } from "./navigation";
+import {
+  getAllowedCapabilitiesForRoles,
+  type Capability,
+  type UserRole
+} from "./authz";
 
-type SessionUser = {
+export type SessionUser = {
   username: string;
   roles: string[];
 };
@@ -101,6 +106,45 @@ export const requireRole = (allowedRoles: string[], fallback = "/login") => {
     return false;
   }
   return true;
+};
+
+export const requireCapability = (
+  requiredAny: Capability[],
+  fallback = "/forbidden"
+) => {
+  const token = requireAuth();
+  if (!token) {
+    return false;
+  }
+  const user = getSessionUser();
+  if (!user) {
+    navigateTo("/login");
+    return false;
+  }
+  const currentCapabilities = getAllowedCapabilitiesForRoles(user.roles);
+  const matched = requiredAny.some((capability) =>
+    currentCapabilities.includes(capability)
+  );
+  if (!matched) {
+    navigateTo(fallback);
+    return false;
+  }
+  return true;
+};
+
+export const getRoleOptions = (): UserRole[] => {
+  const user = getSessionUser();
+  if (!user) {
+    return [];
+  }
+  return user.roles.filter(
+    (role): role is UserRole =>
+      role === "SUPER_ADMIN" ||
+      role === "DEPT_ADMIN" ||
+      role === "MANAGER" ||
+      role === "LEADER" ||
+      role === "EMPLOYEE"
+  );
 };
 
 export const logout = () => {

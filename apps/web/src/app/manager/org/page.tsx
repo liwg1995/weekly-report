@@ -2,7 +2,12 @@
 
 import { FormEvent, useEffect, useState } from "react";
 import { ApiClientError, apiGet, apiPatch, apiPost } from "../../../lib/api-client";
-import { getSessionUser, logoutWithConfirm, requireRole } from "../../../lib/auth-session";
+import AppShell from "../../../components/app-shell";
+import OrgDepartmentPanel from "../../../components/org-department-panel";
+import OrgUserPanel from "../../../components/org-user-panel";
+import PageHeader from "../../../components/page-header";
+import ResultState from "../../../components/result-state";
+import { useAuthGuard } from "../../../lib/use-auth-guard";
 
 type Department = {
   id: number;
@@ -37,8 +42,10 @@ const weekdayOptions = [
 ];
 
 export default function ManagerOrgPage() {
-  const sessionUser = getSessionUser();
-  const [ready, setReady] = useState(false);
+  const guard = useAuthGuard({
+    currentPath: "/manager/org",
+    requiredAny: ["org:read"]
+  });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
@@ -134,20 +141,12 @@ export default function ManagerOrgPage() {
   };
 
   useEffect(() => {
-    const allowed = requireRole(["SUPER_ADMIN", "DEPT_ADMIN"], "/manager/reviews");
-    if (!allowed) {
-      return;
-    }
-    setReady(true);
-  }, []);
-
-  useEffect(() => {
-    if (!ready) {
+    if (!guard.ready) {
       return;
     }
     void loadData();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ready, deptPage, deptPageSize, deptKeyword, userPage, userPageSize, userKeyword, userDepartmentFilter]);
+  }, [guard.ready, deptPage, deptPageSize, deptKeyword, userPage, userPageSize, userKeyword, userDepartmentFilter]);
 
   const submitCreateDepartment = async (event: FormEvent) => {
     event.preventDefault();
@@ -249,263 +248,93 @@ export default function ManagerOrgPage() {
     }
   };
 
-  if (!ready) {
+  if (!guard.ready || guard.blocked) {
     return null;
   }
 
   return (
-    <main style={{ padding: "24px", display: "grid", gap: "16px" }}>
-      <header
-        style={{
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          gap: "12px",
-          flexWrap: "wrap"
-        }}
-      >
-        <div>
-          <h1 style={{ margin: 0, fontSize: "24px" }}>组织管理台</h1>
-          <p style={{ margin: "8px 0 0", color: "var(--muted)" }}>
-            当前用户：{sessionUser?.username}（{sessionUser?.roles.join(" / ") || "未知角色"}）
-          </p>
-        </div>
-        <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
-          <button type="button" onClick={() => (window.location.href = "/manager/reviews")}>
-            审批台
-          </button>
-          <button type="button" onClick={() => (window.location.href = "/manager/performance")}>
-            绩效配置
-          </button>
-          <button type="button" onClick={() => logoutWithConfirm()}>
-            退出登录
-          </button>
-        </div>
-      </header>
+    <AppShell
+      workspace="admin-workspace"
+      pageTitle="组织管理"
+      pageDescription="配置部门、员工归属与汇报关系"
+    >
+      <div style={{ display: "grid", gap: "16px" }}>
+        <PageHeader
+          title="组织管理台"
+          subtitle="按部门、人员、汇报关系拆分配置，减少长页面操作负担。"
+        />
+        {error ? <ResultState type="error" message={error} /> : null}
+        {notice ? <ResultState type="success" message={notice} /> : null}
 
-      {error ? <p style={{ color: "var(--danger)", margin: 0 }}>{error}</p> : null}
-      {notice ? <p style={{ color: "var(--primary-strong)", margin: 0 }}>{notice}</p> : null}
+        <OrgDepartmentPanel
+          submitCreateDepartment={submitCreateDepartment}
+          newDepartmentName={newDepartmentName}
+          onNewDepartmentNameChange={setNewDepartmentName}
+          newDepartmentParentId={newDepartmentParentId}
+          onNewDepartmentParentIdChange={setNewDepartmentParentId}
+          newDepartmentManagerId={newDepartmentManagerId}
+          onNewDepartmentManagerIdChange={setNewDepartmentManagerId}
+          newDepartmentDueWeekday={newDepartmentDueWeekday}
+          onNewDepartmentDueWeekdayChange={setNewDepartmentDueWeekday}
+          deptItems={deptItems}
+          userItems={userItems}
+          weekdayOptions={weekdayOptions}
+          deptKeywordInput={deptKeywordInput}
+          onDeptKeywordInputChange={setDeptKeywordInput}
+          onSearchDepartment={() => {
+            setDeptPage(1);
+            setDeptKeyword(deptKeywordInput);
+          }}
+          deptTotal={deptTotal}
+          deptPage={deptPage}
+          deptPageSize={deptPageSize}
+          onPrevDeptPage={() => setDeptPage((value) => value - 1)}
+          onNextDeptPage={() => setDeptPage((value) => value + 1)}
+          onUpdateDepartmentDueWeekday={(departmentId, value) =>
+            void updateDepartmentDueWeekday(departmentId, value)
+          }
+        />
 
-      <section style={{ border: "1px solid var(--border)", borderRadius: "12px", padding: "12px" }}>
-        <h2 style={{ marginTop: 0 }}>部门设置</h2>
-        <form onSubmit={submitCreateDepartment} style={{ display: "grid", gap: "8px" }}>
-          <input
-            placeholder="部门名称"
-            value={newDepartmentName}
-            onChange={(event) => setNewDepartmentName(event.target.value)}
-          />
-          <select
-            value={newDepartmentParentId}
-            onChange={(event) => setNewDepartmentParentId(event.target.value)}
-          >
-            <option value="">无上级部门</option>
-            {deptItems.map((item) => (
-              <option key={item.id} value={String(item.id)}>
-                {item.name}
-              </option>
-            ))}
-          </select>
-          <select
-            value={newDepartmentManagerId}
-            onChange={(event) => setNewDepartmentManagerId(event.target.value)}
-          >
-            <option value="">未设置负责人</option>
-            {userItems.map((item) => (
-              <option key={item.id} value={String(item.id)}>
-                {item.realName}({item.username})
-              </option>
-            ))}
-          </select>
-          <select
-            value={newDepartmentDueWeekday}
-            onChange={(event) => setNewDepartmentDueWeekday(event.target.value)}
-          >
-            {weekdayOptions.map((option) => (
-              <option key={option.value} value={String(option.value)}>
-                默认提交日：{option.label}
-              </option>
-            ))}
-          </select>
-          <button type="submit">创建部门</button>
-        </form>
-
-        <div style={{ marginTop: "10px", display: "flex", gap: "8px", flexWrap: "wrap" }}>
-          <input
-            placeholder="搜索部门"
-            value={deptKeywordInput}
-            onChange={(event) => setDeptKeywordInput(event.target.value)}
-          />
-          <button
-            type="button"
-            onClick={() => {
-              setDeptPage(1);
-              setDeptKeyword(deptKeywordInput);
-            }}
-          >
-            查询
-          </button>
-          <span>
-            总数：{deptTotal}，第 {deptPage} 页
-          </span>
-          <button type="button" disabled={deptPage <= 1} onClick={() => setDeptPage((value) => value - 1)}>
-            上一页
-          </button>
-          <button
-            type="button"
-            disabled={deptPage * deptPageSize >= deptTotal}
-            onClick={() => setDeptPage((value) => value + 1)}
-          >
-            下一页
-          </button>
-        </div>
-
-        <ul style={{ marginBottom: 0 }}>
-          {deptItems.map((item) => (
-            <li key={item.id} style={{ marginTop: "8px" }}>
-              #{item.id} {item.name} / 上级：{item.parentId ?? "无"} / 负责人：
-              {item.managerUserId ?? "未设置"} / 提交日：
-              <select
-                value={String(item.reportDueWeekday)}
-                onChange={(event) => void updateDepartmentDueWeekday(item.id, Number(event.target.value))}
-              >
-                {weekdayOptions.map((option) => (
-                  <option key={option.value} value={String(option.value)}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
-            </li>
-          ))}
-        </ul>
-      </section>
-
-      <section style={{ border: "1px solid var(--border)", borderRadius: "12px", padding: "12px" }}>
-        <h2 style={{ marginTop: 0 }}>员工与归属设置</h2>
-        <form onSubmit={submitCreateUser} style={{ display: "grid", gap: "8px", marginBottom: "12px" }}>
-          <input
-            placeholder="登录账号（username）"
-            value={newUsername}
-            onChange={(event) => setNewUsername(event.target.value)}
-          />
-          <input
-            placeholder="姓名"
-            value={newRealName}
-            onChange={(event) => setNewRealName(event.target.value)}
-          />
-          <select value={newUserLeaderId} onChange={(event) => setNewUserLeaderId(event.target.value)}>
-            <option value="">直属领导（可选）</option>
-            {userItems.map((item) => (
-              <option key={item.id} value={String(item.id)}>
-                {item.realName}({item.username})
-              </option>
-            ))}
-          </select>
-          <button type="submit">创建员工</button>
-        </form>
-
-        <form onSubmit={submitAssignDepartment} style={{ display: "grid", gap: "8px", marginBottom: "12px" }}>
-          <select value={assignUserId} onChange={(event) => setAssignUserId(event.target.value)}>
-            <option value="">选择员工</option>
-            {userItems.map((item) => (
-              <option key={item.id} value={String(item.id)}>
-                {item.realName}({item.username})
-              </option>
-            ))}
-          </select>
-          <select value={assignDepartmentId} onChange={(event) => setAssignDepartmentId(event.target.value)}>
-            <option value="">选择归属部门</option>
-            {deptItems.map((item) => (
-              <option key={item.id} value={String(item.id)}>
-                {item.name}
-              </option>
-            ))}
-          </select>
-          <select value={assignRoleInDept} onChange={(event) => setAssignRoleInDept(event.target.value)}>
-            <option value="member">员工(member)</option>
-            <option value="admin">部门管理员(admin)</option>
-          </select>
-          <label>
-            <input
-              type="checkbox"
-              checked={assignIsPrimary}
-              onChange={(event) => setAssignIsPrimary(event.target.checked)}
-            />
-            设为主部门
-          </label>
-          <button type="submit">保存员工归属</button>
-        </form>
-
-        <form onSubmit={submitSetLeader} style={{ display: "grid", gap: "8px", marginBottom: "12px" }}>
-          <select value={leaderUserId} onChange={(event) => setLeaderUserId(event.target.value)}>
-            <option value="">选择员工</option>
-            {userItems.map((item) => (
-              <option key={item.id} value={String(item.id)}>
-                {item.realName}({item.username})
-              </option>
-            ))}
-          </select>
-          <select value={leaderLeaderId} onChange={(event) => setLeaderLeaderId(event.target.value)}>
-            <option value="">清空直属领导</option>
-            {userItems.map((item) => (
-              <option key={item.id} value={String(item.id)}>
-                {item.realName}({item.username})
-              </option>
-            ))}
-          </select>
-          <button type="submit">设置直属领导</button>
-        </form>
-
-        <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
-          <input
-            placeholder="搜索员工（账号/姓名）"
-            value={userKeywordInput}
-            onChange={(event) => setUserKeywordInput(event.target.value)}
-          />
-          <select value={userDepartmentFilter} onChange={(event) => setUserDepartmentFilter(event.target.value)}>
-            <option value="">全部部门</option>
-            {deptItems.map((item) => (
-              <option key={item.id} value={String(item.id)}>
-                {item.name}
-              </option>
-            ))}
-          </select>
-          <button
-            type="button"
-            onClick={() => {
-              setUserPage(1);
-              setUserKeyword(userKeywordInput);
-            }}
-          >
-            查询
-          </button>
-          <span>
-            总数：{userTotal}，第 {userPage} 页
-          </span>
-          <button type="button" disabled={userPage <= 1} onClick={() => setUserPage((value) => value - 1)}>
-            上一页
-          </button>
-          <button
-            type="button"
-            disabled={userPage * userPageSize >= userTotal}
-            onClick={() => setUserPage((value) => value + 1)}
-          >
-            下一页
-          </button>
-        </div>
-
-        {loading ? <p>加载中...</p> : null}
-        <ul style={{ marginBottom: 0 }}>
-          {userItems.map((item) => (
-            <li key={item.id} style={{ marginTop: "8px" }}>
-              #{item.id} {item.realName}({item.username}) / 直属领导：
-              {item.leader ? `${item.leader.realName}(${item.leader.username})` : "未设置"} / 部门：
-              {(item.userDepartments || [])
-                .map((relation) => `${relation.department.name}${relation.isPrimary ? "(主)" : ""}/${relation.roleInDept}`)
-                .join("，") || "未归属"}
-            </li>
-          ))}
-        </ul>
-      </section>
-    </main>
+        <OrgUserPanel
+          submitCreateUser={submitCreateUser}
+          newUsername={newUsername}
+          onNewUsernameChange={setNewUsername}
+          newRealName={newRealName}
+          onNewRealNameChange={setNewRealName}
+          newUserLeaderId={newUserLeaderId}
+          onNewUserLeaderIdChange={setNewUserLeaderId}
+          userItems={userItems}
+          submitAssignDepartment={submitAssignDepartment}
+          assignUserId={assignUserId}
+          onAssignUserIdChange={setAssignUserId}
+          assignDepartmentId={assignDepartmentId}
+          onAssignDepartmentIdChange={setAssignDepartmentId}
+          assignRoleInDept={assignRoleInDept}
+          onAssignRoleInDeptChange={setAssignRoleInDept}
+          assignIsPrimary={assignIsPrimary}
+          onAssignIsPrimaryChange={setAssignIsPrimary}
+          deptItems={deptItems}
+          submitSetLeader={submitSetLeader}
+          leaderUserId={leaderUserId}
+          onLeaderUserIdChange={setLeaderUserId}
+          leaderLeaderId={leaderLeaderId}
+          onLeaderLeaderIdChange={setLeaderLeaderId}
+          userKeywordInput={userKeywordInput}
+          onUserKeywordInputChange={setUserKeywordInput}
+          userDepartmentFilter={userDepartmentFilter}
+          onUserDepartmentFilterChange={setUserDepartmentFilter}
+          onSearchUser={() => {
+            setUserPage(1);
+            setUserKeyword(userKeywordInput);
+          }}
+          userTotal={userTotal}
+          userPage={userPage}
+          userPageSize={userPageSize}
+          onPrevUserPage={() => setUserPage((value) => value - 1)}
+          onNextUserPage={() => setUserPage((value) => value + 1)}
+          loading={loading}
+        />
+      </div>
+    </AppShell>
   );
 }

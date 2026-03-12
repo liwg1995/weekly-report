@@ -8,6 +8,7 @@ jest.mock("../../../lib/navigation", () => ({
 
 describe("EmployeeFeedbackPage", () => {
   beforeEach(() => {
+    (navigateTo as jest.Mock).mockClear();
     window.localStorage.setItem("accessToken", "test-token");
     window.localStorage.setItem(
       "sessionUser",
@@ -375,10 +376,10 @@ describe("EmployeeFeedbackPage", () => {
     });
   });
 
-  it("redirects manager role to reviews page", async () => {
+  it("redirects manager role to forbidden page", async () => {
     window.localStorage.setItem(
       "sessionUser",
-      JSON.stringify({ username: "admin", roles: ["SUPER_ADMIN"] })
+      JSON.stringify({ username: "manager01", roles: ["MANAGER"] })
     );
     globalThis.fetch = jest.fn().mockResolvedValue({
       ok: true,
@@ -389,7 +390,7 @@ describe("EmployeeFeedbackPage", () => {
     render(<EmployeeFeedbackPage />);
 
     await waitFor(() => {
-      expect(navigateTo).toHaveBeenCalledWith("/manager/reviews");
+      expect(navigateTo).toHaveBeenCalledWith("/forbidden?from=%2Femployee%2Ffeedback");
     });
   });
 

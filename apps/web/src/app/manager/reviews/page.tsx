@@ -2,8 +2,19 @@
 
 import { useEffect, useState } from "react";
 import { ApiClientError, apiGet, apiPatch, apiPost } from "../../../lib/api-client";
-import { getSessionUser, logoutWithConfirm, requireRole } from "../../../lib/auth-session";
+import { getSessionUser } from "../../../lib/auth-session";
+import AppShell from "../../../components/app-shell";
+import PageHeader from "../../../components/page-header";
+import ReviewsEfficiencyPanel from "../../../components/reviews-efficiency-panel";
+import ResultState from "../../../components/result-state";
+import ReviewsOverviewStats from "../../../components/reviews-overview-stats";
+import ReviewsPerformancePlaceholder from "../../../components/reviews-performance-placeholder";
+import ReviewsQuickNav from "../../../components/reviews-quick-nav";
+import ReviewsLogsPanel from "../../../components/reviews-logs-panel";
+import ReviewsExportHistoryPanel from "../../../components/reviews-export-history-panel";
+import ReviewsTemplatesPanel from "../../../components/reviews-templates-panel";
 import SessionExpiryNotice from "../../../components/session-expiry-notice";
+import { useAuthGuard } from "../../../lib/use-auth-guard";
 import "./reviews.css";
 
 type ReviewItem = {
@@ -180,8 +191,6 @@ const formatTemplateColumns = (columns: ExportTemplate["columns"]) => {
   ].join("，");
 };
 
-const DIFF_VALUE_PREVIEW_MAX = 48;
-
 const readExportColumns = (): Record<ExportColumn, boolean> => {
   if (typeof window === "undefined") {
     return DEFAULT_EXPORT_COLUMNS;
@@ -333,6 +342,10 @@ const readListFilterDefaults = (): ListFilterDefaults => {
 };
 
 export default function ManagerReviewsPage() {
+  const guard = useAuthGuard({
+    currentPath: "/manager/reviews",
+    requiredAny: ["reviews:read"]
+  });
   const [cachedFilterOptions] = useState<CachedFilterOptions>(() => readFilterOptionsCache());
   const [savedListDefaults, setSavedListDefaults] = useState<ListFilterDefaults>(() =>
     readListFilterDefaults()
@@ -698,16 +711,10 @@ export default function ManagerReviewsPage() {
   };
 
   useEffect(() => {
+    if (!guard.ready) {
+      return;
+    }
     const load = async () => {
-      const allowed = requireRole(
-        ["SUPER_ADMIN", "DEPT_ADMIN", "MANAGER", "LEADER"],
-        "/employee/feedback"
-      );
-      if (!allowed) {
-        setLoading(false);
-        return;
-      }
-
       try {
         await loadPendingReports({ page: 1, pageSize: listPageSize, keyword: listKeyword });
         await loadAuditLogs();
@@ -718,7 +725,7 @@ export default function ManagerReviewsPage() {
 
     void load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [guard.ready]);
 
   useEffect(() => {
     if (typeof window === "undefined") {
@@ -1822,67 +1829,36 @@ export default function ManagerReviewsPage() {
     }
   };
 
+  if (!guard.ready || guard.blocked) {
+    return null;
+  }
+
   return (
-    <main className="reviews-page">
-      <div className="reviews-toolbar">
-        <div className="reviews-title-block">
-          <h1>待我审批</h1>
-          <p className="reviews-subtitle">优先处理超期单，批量操作可显著提升提交率与审批效率</p>
-        </div>
-        <button type="button" onClick={() => logoutWithConfirm()}>
-          退出登录
-        </button>
-      </div>
+    <AppShell
+      workspace="review-workspace"
+      pageTitle="审批管理"
+      pageDescription="按优先级处理待办审批，并追踪审批质量。"
+    >
+      <main className="reviews-page">
+      <PageHeader
+        title="待我审批"
+        subtitle="优先处理超期单，批量操作可显著提升提交率与审批效率"
+      />
       <SessionExpiryNotice />
-      <nav className="reviews-quick-nav" aria-label="审批快捷导航">
-        <a href="#pending-list">待审列表</a>
-        <a href="#templates">导出模板</a>
-        <a href="#logs">操作日志</a>
-        <a href="#exports">导出任务</a>
-        <a href="/manager/performance">绩效占位</a>
-      </nav>
+      <ReviewsQuickNav />
       {loading ? <p>加载中...</p> : null}
-      {error ? <p style={{ color: "var(--danger)" }}>{error}</p> : null}
-      {notice ? <p style={{ color: "var(--primary-strong)" }}>{notice}</p> : null}
-      <section className="reviews-stat-grid">
-        <article className="reviews-stat-card">
-          <div className="reviews-stat-label">待审批总数</div>
-          <strong className="reviews-stat-value">{totalItems}</strong>
-        </article>
-        <article style={{ border: "1px solid var(--border)", borderRadius: "10px", padding: "10px" }}>
-          <div className="reviews-stat-label">已选择</div>
-          <strong className="reviews-stat-value">{selectedIds.length}</strong>
-        </article>
-        <article style={{ border: "1px solid var(--border)", borderRadius: "10px", padding: "10px" }}>
-          <div className="reviews-stat-label">最近审批</div>
-          <strong className="reviews-stat-value">
-            通过 {approvedLogCount} / 驳回 {rejectedLogCount}
-          </strong>
-        </article>
-        <article style={{ border: "1px solid var(--border)", borderRadius: "10px", padding: "10px" }}>
-          <div className="reviews-stat-label">{rangeBounds.label}</div>
-          <strong className="reviews-stat-value" data-testid="stats-range-count">
-            {currentRangeCount}
-          </strong>
-          <div
-            style={{ color: "var(--muted)", fontSize: "12px", marginTop: "4px" }}
-            data-testid="stats-range-trend"
-          >
-            {rangeTrendText}
-          </div>
-          <div style={{ display: "flex", gap: "6px", marginTop: "8px", flexWrap: "wrap" }}>
-            <button type="button" onClick={() => setStatsRange("today")}>
-              今日
-            </button>
-            <button type="button" onClick={() => setStatsRange("7d")}>
-              近7天
-            </button>
-            <button type="button" onClick={() => setStatsRange("month")}>
-              本月
-            </button>
-          </div>
-        </article>
-      </section>
+      {error ? <ResultState type="error" message={error} /> : null}
+      {notice ? <ResultState type="success" message={notice} /> : null}
+      <ReviewsOverviewStats
+        totalItems={totalItems}
+        selectedCount={selectedIds.length}
+        approvedLogCount={approvedLogCount}
+        rejectedLogCount={rejectedLogCount}
+        rangeLabel={rangeBounds.label}
+        rangeCount={currentRangeCount}
+        rangeTrendText={rangeTrendText}
+        onRangeChange={setStatsRange}
+      />
       <section style={{ marginBottom: "12px", padding: "12px" }}>
         <h2 style={{ marginTop: 0, fontSize: "16px" }}>列表筛选</h2>
         <div style={{ display: "flex", flexWrap: "wrap", gap: "8px", alignItems: "center" }}>
@@ -2450,187 +2426,56 @@ export default function ManagerReviewsPage() {
         ) : null}
       </section>
       {!loading && !error ? (
-        <section
-          style={{
-            border: "1px solid var(--border)",
-            borderRadius: "12px",
-            padding: "12px",
-            marginBottom: "12px"
+        <ReviewsEfficiencyPanel
+          overdueTodoCount={overdueTodoCount}
+          mentionTodoCount={mentionTodoCount}
+          normalTodoCount={normalTodoCount}
+          sla24Count={sla24Items.length}
+          sla48Count={sla48Items.length}
+          currentCount={items.length}
+          listMyDirectOnly={listMyDirectOnly}
+          onQuickFilter={(input) => applyListQuickFilter(input)}
+          onFocusSla24={() => focusSlaItems(sla24Items.map((item) => item.id), "超24h")}
+          onFocusSla48={() => focusSlaItems(sla48Items.map((item) => item.id), "超48h")}
+          onTriggerNudge={() => void triggerSlaNudgePlaceholder()}
+          nudgeStatusFilter={nudgeStatusFilter}
+          nudgeLevelFilter={nudgeLevelFilter}
+          onNudgeStatusFilterChange={(next) => {
+            setNudgeStatusFilter(next);
+            void loadReviewNudges({ page: 1, status: next, level: nudgeLevelFilter });
           }}
-        >
-          <h2 style={{ marginTop: 0, fontSize: "16px" }}>审批效率面板</h2>
-          <p style={{ marginTop: 0, color: "var(--muted)", fontSize: "12px" }}>
-            今日待办分组（按当前筛选结果）
-          </p>
-          <div style={{ display: "flex", gap: "8px", flexWrap: "wrap", marginBottom: "8px" }}>
-            <span>逾期待办：{overdueTodoCount}</span>
-            <span>@提醒待办：{mentionTodoCount}</span>
-            <span>普通待办：{normalTodoCount}</span>
-            <span>超24h未处理：{sla24Items.length}</span>
-            <span>超48h未处理：{sla48Items.length}</span>
-            <span>当前页总数：{items.length}</span>
-          </div>
-          <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
-            <button
-              type="button"
-              onClick={() =>
-                applyListQuickFilter({
-                  overdueFirst: true,
-                  mentionLeaderOnly: false,
-                  mentionFirst: false,
-                  myDirectOnly: listMyDirectOnly
-                })
-              }
-            >
-              一键处理逾期
-            </button>
-            <button
-              type="button"
-              onClick={() =>
-                applyListQuickFilter({
-                  overdueFirst: false,
-                  mentionLeaderOnly: true,
-                  mentionFirst: true,
-                  myDirectOnly: listMyDirectOnly
-                })
-              }
-            >
-              一键处理@提醒
-            </button>
-            <button
-              type="button"
-              onClick={() =>
-                applyListQuickFilter({
-                  overdueFirst: false,
-                  mentionLeaderOnly: false,
-                  mentionFirst: false,
-                  myDirectOnly: listMyDirectOnly
-                })
-              }
-            >
-              一键处理普通
-            </button>
-            <button type="button" onClick={() => focusSlaItems(sla24Items.map((item) => item.id), "超24h")}>
-              一键定位超24h
-            </button>
-            <button type="button" onClick={() => focusSlaItems(sla48Items.map((item) => item.id), "超48h")}>
-              一键定位超48h
-            </button>
-            <button type="button" onClick={() => void triggerSlaNudgePlaceholder()}>
-              一键催办（占位）
-            </button>
-          </div>
-          <div style={{ marginTop: "8px" }}>
-            <div style={{ color: "var(--muted)", fontSize: "12px", marginBottom: "6px" }}>
-              催办队列
-            </div>
-            <div style={{ display: "flex", gap: "6px", flexWrap: "wrap", marginBottom: "6px" }}>
-              <select
-                aria-label="催办状态筛选"
-                value={nudgeStatusFilter}
-                onChange={(event) => {
-                  const next = event.target.value as "all" | "PENDING" | "SENT" | "FAILED";
-                  setNudgeStatusFilter(next);
-                  void loadReviewNudges({ page: 1, status: next, level: nudgeLevelFilter });
-                }}
-              >
-                <option value="all">全部状态</option>
-                <option value="PENDING">待发送</option>
-                <option value="SENT">已发送</option>
-                <option value="FAILED">失败</option>
-              </select>
-              <select
-                aria-label="催办级别筛选"
-                value={nudgeLevelFilter}
-                onChange={(event) => {
-                  const next = event.target.value as "all" | "SLA24" | "SLA48";
-                  setNudgeLevelFilter(next);
-                  void loadReviewNudges({ page: 1, status: nudgeStatusFilter, level: next });
-                }}
-              >
-                <option value="all">全部级别</option>
-                <option value="SLA24">SLA24</option>
-                <option value="SLA48">SLA48</option>
-              </select>
-              <button type="button" onClick={() => void loadReviewNudges({ page: 1 })}>
-                刷新催办队列
+          onNudgeLevelFilterChange={(next) => {
+            setNudgeLevelFilter(next);
+            void loadReviewNudges({ page: 1, status: nudgeStatusFilter, level: next });
+          }}
+          onRefreshNudges={() => void loadReviewNudges({ page: 1 })}
+          onRetrySelectedNudges={() => void retrySelectedNudges()}
+          nudgeSelectedIds={nudgeSelectedIds}
+          nudgeTotal={nudgeTotal}
+          reviewNudges={reviewNudges}
+          renderNudgeItemActions={(id) => (
+            <>
+              <button type="button" onClick={() => void updateReviewNudgeStatus(id, "markSent")}>
+                标记已发送
               </button>
-              <button type="button" onClick={() => void retrySelectedNudges()}>
-                批量重试
+              <button type="button" onClick={() => void updateReviewNudgeStatus(id, "markFailed")}>
+                标记失败
               </button>
-              <span style={{ color: "var(--muted)", fontSize: "12px", alignSelf: "center" }}>
-                已选 {nudgeSelectedIds.length} / 共 {nudgeTotal}
-              </span>
-            </div>
-            {reviewNudges.length === 0 ? (
-              <div style={{ color: "var(--muted)", fontSize: "12px" }}>暂无催办任务</div>
-            ) : (
-              <ul style={{ listStyle: "none", padding: 0, margin: 0, display: "grid", gap: "6px" }}>
-                {reviewNudges.map((item) => (
-                  <li
-                    key={item.id}
-                    style={{
-                      border: "1px solid var(--border)",
-                      borderRadius: "8px",
-                      padding: "8px",
-                      display: "grid",
-                      gap: "6px"
-                    }}
-                  >
-                    <div style={{ fontSize: "12px", display: "flex", gap: "8px", alignItems: "center" }}>
-                      <input
-                        type="checkbox"
-                        aria-label={`选择催办任务-${item.id}`}
-                        checked={nudgeSelectedIds.includes(item.id)}
-                        onChange={(event) =>
-                          setNudgeSelectedIds((prev) =>
-                            event.target.checked
-                              ? [...new Set([...prev, item.id])]
-                              : prev.filter((x) => x !== item.id)
-                          )
-                        }
-                      />
-                      <span>
-                        #{item.id} {item.level} / {item.targetCount}条 / {item.status}
-                      </span>
-                    </div>
-                    <div style={{ color: "var(--muted)", fontSize: "12px" }}>{item.message}</div>
-                    <div style={{ display: "flex", gap: "6px", flexWrap: "wrap" }}>
-                      <button type="button" onClick={() => void updateReviewNudgeStatus(item.id, "markSent")}>
-                        标记已发送
-                      </button>
-                      <button type="button" onClick={() => void updateReviewNudgeStatus(item.id, "markFailed")}>
-                        标记失败
-                      </button>
-                      <button type="button" onClick={() => void updateReviewNudgeStatus(item.id, "retry")}>
-                        重试
-                      </button>
-                    </div>
-                  </li>
-                ))}
-              </ul>
-            )}
-            <div style={{ display: "flex", gap: "8px", marginTop: "8px", fontSize: "12px" }}>
-              <button
-                type="button"
-                disabled={nudgePage <= 1}
-                onClick={() => void loadReviewNudges({ page: Math.max(1, nudgePage - 1) })}
-              >
-                上一页
+              <button type="button" onClick={() => void updateReviewNudgeStatus(id, "retry")}>
+                重试
               </button>
-              <button
-                type="button"
-                disabled={nudgePage * nudgePageSize >= nudgeTotal}
-                onClick={() => void loadReviewNudges({ page: nudgePage + 1 })}
-              >
-                下一页
-              </button>
-              <span style={{ color: "var(--muted)" }}>
-                第 {nudgePage} 页 / 每页 {nudgePageSize} 条 / 总计 {nudgeTotal}
-              </span>
-            </div>
-          </div>
-        </section>
+            </>
+          )}
+          onToggleNudgeSelection={(id, checked) =>
+            setNudgeSelectedIds((prev) =>
+              checked ? [...new Set([...prev, id])] : prev.filter((x) => x !== id)
+            )
+          }
+          nudgePage={nudgePage}
+          nudgePageSize={nudgePageSize}
+          onPrevNudgePage={() => void loadReviewNudges({ page: Math.max(1, nudgePage - 1) })}
+          onNextNudgePage={() => void loadReviewNudges({ page: nudgePage + 1 })}
+        />
       ) : null}
       {!loading && !error && items.length === 0 ? <p>当前没有待审批周报。</p> : null}
       {!loading && !error && items.length > 0 ? (
@@ -2809,582 +2654,122 @@ export default function ManagerReviewsPage() {
           </div>
         </section>
       ) : null}
-      <section id="templates" style={{ marginTop: "16px", padding: "12px" }}>
-        <h2 style={{ marginTop: 0, fontSize: "16px" }}>导出模板</h2>
-        <div style={{ display: "flex", gap: "8px", flexWrap: "wrap", marginBottom: "8px" }}>
-          <label>
-            <input
-              type="checkbox"
-              aria-label="导出差异TXT脱敏"
-              checked={maskSensitiveInDiffExport}
-              onChange={(event) => setMaskSensitiveInDiffExport(event.target.checked)}
-            />
-            导出差异TXT脱敏
-          </label>
-          {isSuperAdmin ? (
-            <>
-              <input
-                aria-label="模板用户ID"
-                placeholder="用户ID（超级管理员）"
-                value={templateOwnerUserId}
-                onChange={(event) => setTemplateOwnerUserId(event.target.value)}
-              />
-              <button
-                type="button"
-                onClick={() => void loadTemplatesFromServer(undefined, { switching: true })}
-              >
-                切换用户模板
-              </button>
-            </>
-          ) : null}
-          <input
-            aria-label="模板名称"
-            placeholder="输入模板名称"
-            value={templateName}
-            onChange={(event) => setTemplateName(event.target.value)}
-          />
-          <input
-            aria-label="模板搜索"
-            placeholder="搜索模板"
-            value={templateQuery}
-            onChange={(event) => setTemplateQuery(event.target.value)}
-          />
-          <button type="button" onClick={saveCurrentAsTemplate}>
-            收藏当前配置为模板
-          </button>
-          <button type="button" onClick={exportTemplatesAsJson}>
-            导出模板JSON
-          </button>
-          <button type="button" onClick={importTemplatesFromJson}>
-            导入模板JSON
-          </button>
-        </div>
-        <textarea
-          aria-label="模板JSON内容"
-          placeholder="粘贴模板 JSON 数组"
-          value={templateJsonText}
-          onChange={(event) => {
-            setTemplateJsonText(event.target.value);
-            if (pendingImportTemplates) {
-              setPendingImportTemplates(null);
-              setPendingDuplicateCount(0);
-            }
-          }}
-          rows={4}
-          style={{
-            width: "100%",
-            border: "1px solid var(--border)",
-            borderRadius: "8px",
-            padding: "8px",
-            marginBottom: "8px"
-          }}
-        />
-        <p style={{ marginTop: 0, marginBottom: "8px", color: "var(--muted)" }}>
-          模板JSON字段说明：diffExportMaskSensitive=true（脱敏）、false（原文）
-        </p>
-        {pendingImportTemplates && pendingDuplicateCount > 0 ? (
-          <div style={{ marginBottom: "8px" }}>
-            <p style={{ marginTop: 0 }}>
-              检测到 {pendingDuplicateCount} 个同名模板
-            </p>
-            <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
-              <button
-                type="button"
-                onClick={() => applyImportedTemplates(pendingImportTemplates, "overwrite")}
-              >
-                覆盖同名并导入
-              </button>
-              <button
-                type="button"
-                onClick={() => applyImportedTemplates(pendingImportTemplates, "skip")}
-              >
-                跳过同名并导入
-              </button>
-            </div>
-          </div>
-        ) : null}
-        {templateSwitching ? (
-          <p style={{ marginTop: 0, marginBottom: "8px" }}>正在切换模板用户...</p>
-        ) : null}
-        {!templateSwitching &&
-        isSuperAdmin &&
-        templateSwitchedOwner &&
-        filteredTemplates.length === 0 ? (
-          <p style={{ marginTop: 0, marginBottom: "8px" }}>该用户暂无模板</p>
-        ) : null}
-        {filteredTemplates.length === 0 ? <p style={{ margin: 0 }}>暂无模板</p> : null}
-        {filteredTemplates.length > 0 ? (
-          <ul style={{ margin: 0, paddingLeft: "18px" }}>
-            {filteredTemplates.map((template) => (
-              <li key={template.id} data-testid="export-template-item">
-                <strong>{template.name}</strong>{" "}
-                {template.pinned ? <span style={{ color: "var(--primary-strong)" }}>[已置顶]</span> : null}{" "}
-                <span style={{ color: "var(--muted)" }}>
-                  差异TXT默认：
-                  {typeof template.diffExportMaskSensitive === "boolean"
-                    ? template.diffExportMaskSensitive
-                      ? "脱敏"
-                      : "原文"
-                    : maskSensitiveInDiffExport
-                      ? "脱敏（跟随全局）"
-                      : "原文（跟随全局）"}
-                </span>{" "}
-                <button
-                  type="button"
-                  aria-label={`切换模板脱敏默认-${template.name}`}
-                  onClick={() => toggleTemplateDiffMaskDefault(template.id)}
-                >
-                  {(() => {
-                    const current =
-                      typeof template.diffExportMaskSensitive === "boolean"
-                        ? template.diffExportMaskSensitive
-                        : maskSensitiveInDiffExport;
-                    return current ? "设为原文" : "设为脱敏";
-                  })()}
-                </button>{" "}
-                <button
-                  type="button"
-                  aria-label={`置顶模板-${template.name}`}
-                  onClick={() => togglePinTemplate(template.id)}
-                >
-                  {template.pinned ? "取消置顶" : "置顶"}
-                </button>{" "}
-                <button
-                  type="button"
-                  aria-label={`应用模板并导出-${template.name}`}
-                  onClick={() => applyTemplateExport(template)}
-                >
-                  应用模板并导出
-                </button>
-                {" "}
-                <button
-                  type="button"
-                  aria-label={`查看模板版本-${template.name}`}
-                  onClick={() => loadTemplateVersions(template.id)}
-                >
-                  {templateVersionLoadingId === template.id ? "加载中..." : "历史版本"}
-                </button>
-                {" "}
-                <input
-                  aria-label={`模板新名称-${template.name}`}
-                  placeholder="新名称"
-                  value={templateRenameMap[template.id] ?? ""}
-                  onChange={(event) =>
-                    setTemplateRenameMap((prev) => ({
-                      ...prev,
-                      [template.id]: event.target.value
-                    }))
-                  }
-                />
-                {" "}
-                <button
-                  type="button"
-                  aria-label={`重命名模板-${template.name}`}
-                  onClick={() => renameTemplate(template.id, template.name)}
-                >
-                  重命名
-                </button>
-                {" "}
-                <button
-                  type="button"
-                  aria-label={`删除模板-${template.name}`}
-                  onClick={() => removeTemplate(template.id)}
-                >
-                  删除模板
-                </button>
-                {templateVersions[template.id]?.length ? (
-                  <ul style={{ marginTop: "6px", marginBottom: 0 }}>
-                    {templateVersions[template.id].map((version) => (
-                      <li key={version.id}>
-                        版本#{version.id}（{formatHistoryTime(version.createdAt)}）{" "}
-                        <span style={{ color: "var(--muted)" }}>
-                          与当前差异：{buildTemplateDiffSummary(template, version)}
-                        </span>{" "}
-                        <button
-                          type="button"
-                          aria-label={`复制差异详情-${template.name}-${version.id}`}
-                          onClick={() => copyTemplateDiffDetails(template, version)}
-                        >
-                          复制差异
-                        </button>{" "}
-                        <button
-                          type="button"
-                          aria-label={`导出差异详情TXT-${template.name}-${version.id}`}
-                          onClick={() => exportTemplateDiffDetailsTxt(template, version)}
-                        >
-                          导出差异TXT
-                        </button>{" "}
-                        <button
-                          type="button"
-                          aria-label={`查看差异详情-${template.name}-${version.id}`}
-                          onClick={() =>
-                            setTemplateVersionDiffOpenMap((prev) => ({
-                              ...prev,
-                              [`${template.id}-${version.id}`]:
-                                !prev[`${template.id}-${version.id}`]
-                            }))
-                          }
-                        >
-                          {templateVersionDiffOpenMap[`${template.id}-${version.id}`]
-                            ? "收起差异详情"
-                            : "查看差异详情"}
-                        </button>{" "}
-                        <button
-                          type="button"
-                          aria-label={`回滚模板版本-${template.name}-${version.id}`}
-                          onClick={() => rollbackTemplate(template.id, version.id)}
-                        >
-                          回滚到该版本
-                        </button>
-                        {templateVersionDiffOpenMap[`${template.id}-${version.id}`] ? (
-                          <ul style={{ marginTop: "4px", marginBottom: 0 }}>
-                            {buildTemplateDiffDetails(template, version).map((detail) => (
-                              <li
-                                key={detail.label}
-                                data-testid={`template-diff-row-${template.id}-${version.id}-${detail.label}`}
-                                style={{
-                                  background: "rgba(25, 118, 210, 0.08)",
-                                  border: "1px solid rgba(25, 118, 210, 0.28)",
-                                  borderRadius: "8px",
-                                  padding: "6px"
-                                }}
-                              >
-                                <div>字段：{detail.label}</div>
-                                <div>
-                                  当前：
-                                  {(() => {
-                                    const expandKey = `${template.id}-${version.id}-${detail.label}-current`;
-                                    const expanded = Boolean(templateDiffValueExpandMap[expandKey]);
-                                    const needsCollapse = detail.current.length > DIFF_VALUE_PREVIEW_MAX;
-                                    const displayed =
-                                      needsCollapse && !expanded
-                                        ? `${detail.current.slice(0, DIFF_VALUE_PREVIEW_MAX)}...`
-                                        : detail.current;
-                                    return (
-                                      <>
-                                        {displayed}
-                                        {needsCollapse ? (
-                                          <>
-                                            {" "}
-                                            <button
-                                              type="button"
-                                              aria-label={`${
-                                                expanded ? "收起" : "展开"
-                                              }差异值-${template.name}-${version.id}-${detail.label}-current`}
-                                              onClick={() =>
-                                                setTemplateDiffValueExpandMap((prev) => ({
-                                                  ...prev,
-                                                  [expandKey]: !prev[expandKey]
-                                                }))
-                                              }
-                                            >
-                                              {expanded ? "收起" : "展开"}
-                                            </button>
-                                          </>
-                                        ) : null}
-                                      </>
-                                    );
-                                  })()}
-                                </div>
-                                <div>
-                                  历史：
-                                  {(() => {
-                                    const expandKey = `${template.id}-${version.id}-${detail.label}-history`;
-                                    const expanded = Boolean(templateDiffValueExpandMap[expandKey]);
-                                    const needsCollapse = detail.history.length > DIFF_VALUE_PREVIEW_MAX;
-                                    const displayed =
-                                      needsCollapse && !expanded
-                                        ? `${detail.history.slice(0, DIFF_VALUE_PREVIEW_MAX)}...`
-                                        : detail.history;
-                                    return (
-                                      <>
-                                        {displayed}
-                                        {needsCollapse ? (
-                                          <>
-                                            {" "}
-                                            <button
-                                              type="button"
-                                              aria-label={`${
-                                                expanded ? "收起" : "展开"
-                                              }差异值-${template.name}-${version.id}-${detail.label}-history`}
-                                              onClick={() =>
-                                                setTemplateDiffValueExpandMap((prev) => ({
-                                                  ...prev,
-                                                  [expandKey]: !prev[expandKey]
-                                                }))
-                                              }
-                                            >
-                                              {expanded ? "收起" : "展开"}
-                                            </button>
-                                          </>
-                                        ) : null}
-                                      </>
-                                    );
-                                  })()}
-                                </div>
-                              </li>
-                            ))}
-                          </ul>
-                        ) : null}
-                      </li>
-                    ))}
-                  </ul>
-                ) : null}
-              </li>
-            ))}
-          </ul>
-        ) : null}
-      </section>
-      <section id="logs" style={{ marginTop: "16px", padding: "12px" }}>
-        <h2 style={{ marginTop: 0, fontSize: "16px" }}>操作日志</h2>
-        <div style={{ display: "flex", flexWrap: "wrap", gap: "8px", marginBottom: "10px" }}>
-          <label>
-            结果：
-            <select
-              aria-label="日志结果筛选"
-              value={logDecision}
-              onChange={(event) =>
-                setLogDecision(event.target.value as "all" | "APPROVED" | "REJECTED")
-              }
-              style={{ marginLeft: "6px" }}
-            >
-              <option value="all">全部</option>
-              <option value="APPROVED">仅通过</option>
-              <option value="REJECTED">仅驳回</option>
-            </select>
-          </label>
-          <label>
-            审批人：
-            <input
-              aria-label="日志审批人筛选"
-              value={logActorKeyword}
-              onChange={(event) => setLogActorKeyword(event.target.value)}
-              placeholder="姓名或账号"
-              style={{ marginLeft: "6px" }}
-            />
-          </label>
-          <label>
-            开始：
-            <input
-              aria-label="日志开始日期筛选"
-              type="date"
-              value={logDateFrom}
-              onChange={(event) => setLogDateFrom(event.target.value)}
-              style={{ marginLeft: "6px" }}
-            />
-          </label>
-          <label>
-            结束：
-            <input
-              aria-label="日志结束日期筛选"
-              type="date"
-              value={logDateTo}
-              onChange={(event) => setLogDateTo(event.target.value)}
-              style={{ marginLeft: "6px" }}
-            />
-          </label>
-          <button type="button" onClick={() => void loadAuditLogs()}>
-            筛选日志
-          </button>
-          <button type="button" onClick={() => applyExportPreset("retro")}>
-            复盘版预设
-          </button>
-          <button type="button" onClick={() => applyExportPreset("audit")}>
-            审计版预设
-          </button>
-          <span style={{ color: "var(--muted)" }}>导出字段：</span>
-          <label>
-            <input
-              aria-label="导出字段-时间"
-              type="checkbox"
-              checked={exportColumns.time}
-              onChange={(event) =>
-                setExportColumns((prev) => ({ ...prev, time: event.target.checked }))
-              }
-            />
-            时间
-          </label>
-          <label>
-            <input
-              aria-label="导出字段-审批人"
-              type="checkbox"
-              checked={exportColumns.actor}
-              onChange={(event) =>
-                setExportColumns((prev) => ({ ...prev, actor: event.target.checked }))
-              }
-            />
-            审批人
-          </label>
-          <label>
-            <input
-              aria-label="导出字段-动作"
-              type="checkbox"
-              checked={exportColumns.action}
-              onChange={(event) =>
-                setExportColumns((prev) => ({ ...prev, action: event.target.checked }))
-              }
-            />
-            动作
-          </label>
-          <label>
-            <input
-              aria-label="导出字段-周报ID"
-              type="checkbox"
-              checked={exportColumns.targetId}
-              onChange={(event) =>
-                setExportColumns((prev) => ({ ...prev, targetId: event.target.checked }))
-              }
-            />
-            周报ID
-          </label>
-          <label>
-            编码：
-            <select
-              aria-label="导出编码"
-              value={exportEncoding}
-              onChange={(event) => setExportEncoding(event.target.value as "utf-8" | "gbk")}
-              style={{ marginLeft: "6px" }}
-            >
-              <option value="utf-8">UTF-8</option>
-              <option value="gbk">GBK</option>
-            </select>
-          </label>
-          <button type="button" onClick={() => exportLogsCsv()}>
-            导出CSV
-          </button>
-        </div>
-        {logs.length === 0 ? <p style={{ margin: 0 }}>暂无操作日志</p> : null}
-        {logs.length > 0 ? (
-          <ul style={{ margin: 0, paddingLeft: "18px" }}>
-            {logs.map((item) => {
-              const actionText = item.action === "REVIEW_APPROVED" ? "通过" : "驳回";
-              const actorName = item.actor?.realName || item.actor?.username || "未知审批人";
-              return (
-                <li key={item.id}>
-                  {actorName} {actionText}周报 #{item.targetId}（{formatLogTime(item.createdAt)}）
-                </li>
-              );
-            })}
-          </ul>
-        ) : null}
-      </section>
-      <section id="exports" style={{ marginTop: "16px", padding: "12px" }}>
-        <h2 style={{ marginTop: 0, fontSize: "16px" }}>导出任务中心</h2>
-        <div style={{ display: "flex", gap: "8px", flexWrap: "wrap", marginBottom: "8px" }}>
-          <input
-            aria-label="导出记录搜索"
-            placeholder="按文件名搜索"
-            value={historyQuery}
-            onChange={(event) => setHistoryQuery(event.target.value)}
-          />
-          {sortedHistory.length > 0 ? (
-            <>
-              <label>
-                排序：
-                <select
-                  aria-label="导出记录排序字段"
-                  value={historySortBy}
-                  onChange={(event) =>
-                    setHistorySortBy(event.target.value as "createdAt" | "fileName")
-                  }
-                  style={{ marginLeft: "6px" }}
-                >
-                  <option value="createdAt">时间</option>
-                  <option value="fileName">文件名</option>
-                </select>
-              </label>
-              <button
-                type="button"
-                onClick={() =>
-                  setHistorySortDir((prev) => (prev === "asc" ? "desc" : "asc"))
-                }
-              >
-                切换排序方向
-              </button>
-              <button
-                type="button"
-                onClick={() => setHistoryPage((prev) => Math.max(1, prev - 1))}
-                disabled={safeHistoryPage <= 1}
-              >
-                上一页
-              </button>
-              <button
-                type="button"
-                onClick={() =>
-                  setHistoryPage((prev) => Math.min(historyPageCount, prev + 1))
-                }
-                disabled={safeHistoryPage >= historyPageCount}
-              >
-                下一页
-              </button>
-              <span style={{ color: "var(--muted)" }}>
-                第 {safeHistoryPage} / {historyPageCount} 页
-              </span>
-            </>
-          ) : null}
-        </div>
-        {exportHistory.length > 0 ? (
-          <div style={{ marginBottom: "8px" }}>
-            <button type="button" onClick={clearHistory}>
-              清空导出记录
-            </button>
-          </div>
-        ) : null}
-        {sortedHistory.length === 0 ? <p style={{ margin: 0 }}>暂无导出记录</p> : null}
-        {sortedHistory.length > 0 ? (
-          <ul style={{ margin: 0, paddingLeft: "18px" }}>
-            {pagedHistory.map((item) => (
-              <li key={item.id}>
-                <span>{item.fileName}</span>{" "}
-                <span style={{ color: "var(--muted)" }}>（{formatHistoryTime(item.createdAt)}）</span>{" "}
-                <div style={{ display: "inline-flex", gap: "6px", flexWrap: "wrap", marginLeft: "6px" }}>
-                  {item.filters?.decision && item.filters.decision !== "all" ? (
-                    <span>
-                      结果: {item.filters.decision === "APPROVED" ? "仅通过" : "仅驳回"}
-                    </span>
-                  ) : null}
-                  {item.filters?.actorKeyword ? (
-                    <span>审批人: {item.filters.actorKeyword}</span>
-                  ) : null}
-                  {item.filters?.dateFrom || item.filters?.dateTo ? (
-                    <span>
-                      日期: {item.filters?.dateFrom || "start"} ~ {item.filters?.dateTo || "today"}
-                    </span>
-                  ) : null}
-                </div>{" "}
-                <button
-                  type="button"
-                  aria-label={`复用筛选并导出-${item.fileName}`}
-                  onClick={() => reuseHistoryExport(item)}
-                >
-                  复用筛选并导出
-                </button>
-                {" "}
-                <button
-                  type="button"
-                  aria-label={`重新下载-${item.fileName}`}
-                  onClick={() => reDownloadHistory(item)}
-                >
-                  重新下载
-                </button>
-                {" "}
-                <button
-                  type="button"
-                  aria-label={`删除记录-${item.fileName}`}
-                  onClick={() => removeHistoryItem(item.id)}
-                >
-                  删除记录
-                </button>
-              </li>
-            ))}
-          </ul>
-        ) : null}
-      </section>
-      <section className="reviews-performance-placeholder">
-        <h2 style={{ marginTop: 0, fontSize: "16px" }}>绩效考核（占位）</h2>
-        <p>当前仅提供结构占位，后续将接入评分规则、周期配置与审批结果联动。</p>
-        <p style={{ color: "var(--muted)", fontSize: "12px" }}>可先进入绩效占位页进行字段评审：<a href="/manager/performance">/manager/performance</a></p>
-      </section>
-    </main>
+      <ReviewsTemplatesPanel
+        isSuperAdmin={isSuperAdmin}
+        maskSensitiveInDiffExport={maskSensitiveInDiffExport}
+        onMaskSensitiveChange={setMaskSensitiveInDiffExport}
+        templateOwnerUserId={templateOwnerUserId}
+        onTemplateOwnerUserIdChange={setTemplateOwnerUserId}
+        onSwitchTemplateOwner={() => void loadTemplatesFromServer(undefined, { switching: true })}
+        templateName={templateName}
+        onTemplateNameChange={setTemplateName}
+        templateQuery={templateQuery}
+        onTemplateQueryChange={setTemplateQuery}
+        onSaveCurrentAsTemplate={saveCurrentAsTemplate}
+        onExportTemplatesAsJson={exportTemplatesAsJson}
+        onImportTemplatesFromJson={importTemplatesFromJson}
+        templateJsonText={templateJsonText}
+        onTemplateJsonTextChange={(value) => {
+          setTemplateJsonText(value);
+          if (pendingImportTemplates) {
+            setPendingImportTemplates(null);
+            setPendingDuplicateCount(0);
+          }
+        }}
+        showPendingImportConflict={Boolean(pendingImportTemplates && pendingDuplicateCount > 0)}
+        pendingDuplicateCount={pendingDuplicateCount}
+        onImportOverwrite={() => {
+          if (pendingImportTemplates) {
+            void applyImportedTemplates(pendingImportTemplates, "overwrite");
+          }
+        }}
+        onImportSkip={() => {
+          if (pendingImportTemplates) {
+            void applyImportedTemplates(pendingImportTemplates, "skip");
+          }
+        }}
+        templateSwitching={templateSwitching}
+        templateSwitchedOwner={templateSwitchedOwner}
+        filteredTemplates={filteredTemplates}
+        templateVersionLoadingId={templateVersionLoadingId}
+        templateRenameMap={templateRenameMap}
+        templateVersions={templateVersions}
+        templateVersionDiffOpenMap={templateVersionDiffOpenMap}
+        templateDiffValueExpandMap={templateDiffValueExpandMap}
+        onToggleTemplateDiffMaskDefault={(id) => void toggleTemplateDiffMaskDefault(id)}
+        onTogglePinTemplate={(id) => void togglePinTemplate(id)}
+        onApplyTemplateExport={applyTemplateExport}
+        onLoadTemplateVersions={(id) => void loadTemplateVersions(id)}
+        onTemplateRenameInputChange={(id, value) =>
+          setTemplateRenameMap((prev) => ({ ...prev, [id]: value }))
+        }
+        onRenameTemplate={(id, fallbackName) => void renameTemplate(id, fallbackName)}
+        onRemoveTemplate={(id) => void removeTemplate(id)}
+        formatHistoryTime={formatHistoryTime}
+        buildTemplateDiffSummary={buildTemplateDiffSummary}
+        onCopyTemplateDiffDetails={copyTemplateDiffDetails}
+        onExportTemplateDiffDetailsTxt={exportTemplateDiffDetailsTxt}
+        onToggleTemplateVersionDiff={(templateId, versionId) =>
+          setTemplateVersionDiffOpenMap((prev) => ({
+            ...prev,
+            [`${templateId}-${versionId}`]: !prev[`${templateId}-${versionId}`]
+          }))
+        }
+        onRollbackTemplate={(templateId, versionId) => void rollbackTemplate(templateId, versionId)}
+        buildTemplateDiffDetails={buildTemplateDiffDetails}
+        onToggleTemplateDiffValueExpand={(key) =>
+          setTemplateDiffValueExpandMap((prev) => ({
+            ...prev,
+            [key]: !prev[key]
+          }))
+        }
+      />
+      <ReviewsLogsPanel
+        logDecision={logDecision}
+        onLogDecisionChange={setLogDecision}
+        logActorKeyword={logActorKeyword}
+        onLogActorKeywordChange={setLogActorKeyword}
+        logDateFrom={logDateFrom}
+        onLogDateFromChange={setLogDateFrom}
+        logDateTo={logDateTo}
+        onLogDateToChange={setLogDateTo}
+        onLoadAuditLogs={() => void loadAuditLogs()}
+        onApplyExportPreset={applyExportPreset}
+        exportColumns={exportColumns}
+        onExportColumnChange={(column, checked) =>
+          setExportColumns((prev) => ({ ...prev, [column]: checked }))
+        }
+        exportEncoding={exportEncoding}
+        onExportEncodingChange={setExportEncoding}
+        onExportLogsCsv={() => void exportLogsCsv()}
+        logs={logs}
+        formatLogTime={formatLogTime}
+      />
+      <ReviewsExportHistoryPanel
+        historyQuery={historyQuery}
+        onHistoryQueryChange={setHistoryQuery}
+        hasSortedHistory={sortedHistory.length > 0}
+        historySortBy={historySortBy}
+        onHistorySortByChange={setHistorySortBy}
+        onToggleHistorySortDir={() =>
+          setHistorySortDir((prev) => (prev === "asc" ? "desc" : "asc"))
+        }
+        onPrevHistoryPage={() => setHistoryPage((prev) => Math.max(1, prev - 1))}
+        onNextHistoryPage={() =>
+          setHistoryPage((prev) => Math.min(historyPageCount, prev + 1))
+        }
+        safeHistoryPage={safeHistoryPage}
+        historyPageCount={historyPageCount}
+        hasAnyExportHistory={exportHistory.length > 0}
+        onClearHistory={clearHistory}
+        pagedHistory={pagedHistory}
+        onReuseHistoryExport={reuseHistoryExport}
+        onReDownloadHistory={reDownloadHistory}
+        onRemoveHistoryItem={removeHistoryItem}
+        formatHistoryTime={formatHistoryTime}
+      />
+      <ReviewsPerformancePlaceholder />
+      </main>
+    </AppShell>
   );
 }

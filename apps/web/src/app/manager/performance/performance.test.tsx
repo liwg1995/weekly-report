@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import ManagerPerformancePage from "./page";
 import { navigateTo } from "../../../lib/navigation";
 
@@ -8,6 +8,7 @@ jest.mock("../../../lib/navigation", () => ({
 
 describe("ManagerPerformancePage", () => {
   beforeEach(() => {
+    (navigateTo as jest.Mock).mockClear();
     window.localStorage.setItem("accessToken", "token");
     window.localStorage.setItem(
       "sessionUser",
@@ -70,7 +71,7 @@ describe("ManagerPerformancePage", () => {
     );
   });
 
-  it("redirects employee role to feedback page", async () => {
+  it("redirects employee role to forbidden page", async () => {
     window.localStorage.setItem(
       "sessionUser",
       JSON.stringify({ username: "alice", roles: ["EMPLOYEE"] })
@@ -79,7 +80,7 @@ describe("ManagerPerformancePage", () => {
     render(<ManagerPerformancePage />);
 
     await waitFor(() => {
-      expect(navigateTo).toHaveBeenCalledWith("/employee/feedback");
+      expect(navigateTo).toHaveBeenCalledWith("/forbidden?from=%2Fmanager%2Fperformance");
     });
   });
 
@@ -117,7 +118,9 @@ describe("ManagerPerformancePage", () => {
     fireEvent.change(cycleNameInput, { target: { value: "2026Q4" } });
     fireEvent.change(cycleStartInput, { target: { value: "2026-10-01" } });
     fireEvent.change(cycleEndInput, { target: { value: "2026-12-31" } });
-    fireEvent.click(createButton);
+    await act(async () => {
+      fireEvent.click(createButton);
+    });
 
     await waitFor(() => {
       expect(fetchMock).toHaveBeenCalledWith(
@@ -153,7 +156,9 @@ describe("ManagerPerformancePage", () => {
     fireEvent.change(cycleEndInput, { target: { value: "2026-12-31" } });
 
     expect(createButton).toBeEnabled();
-    fireEvent.click(createButton);
+    await act(async () => {
+      fireEvent.click(createButton);
+    });
     expect(screen.queryByText("请先补全必填项后再提交。")).not.toBeInTheDocument();
   });
 
@@ -189,6 +194,7 @@ describe("ManagerPerformancePage", () => {
 
     await waitFor(() => {
       expect(screen.getByRole("button", { name: "新增绩效维度" })).toBeInTheDocument();
+      expect(screen.getByRole("option", { name: "2026Q3" })).toBeInTheDocument();
     });
 
     const createDimensionButton = screen.getByRole("button", { name: "新增绩效维度" });

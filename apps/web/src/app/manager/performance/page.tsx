@@ -5,6 +5,9 @@ import { ApiClientError, apiDelete, apiGet, apiPatch, apiPost } from "../../../l
 import { getSessionUser } from "../../../lib/auth-session";
 import AppShell from "../../../components/app-shell";
 import PageHeader from "../../../components/page-header";
+import PerformanceCyclesPanel from "../../../components/performance-cycles-panel";
+import PerformanceDimensionsPanel from "../../../components/performance-dimensions-panel";
+import PerformanceTodosPanel from "../../../components/performance-todos-panel";
 import ResultState from "../../../components/result-state";
 import { useAuthGuard } from "../../../lib/use-auth-guard";
 
@@ -309,250 +312,80 @@ export default function ManagerPerformancePage() {
         {error ? <ResultState type="error" message={error} /> : null}
         {notice ? <ResultState type="success" message={notice} /> : null}
 
-      <section style={{ marginTop: "14px", border: "1px solid var(--border)", borderRadius: "12px", padding: "12px", background: "var(--surface)" }}>
-        <h2 style={{ marginTop: 0, fontSize: "16px" }}>配置绩效周期</h2>
-        <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
-          <label>
-            周期名称
-            <input aria-label="绩效周期名称" value={cycleName} onChange={(event) => setCycleName(event.target.value)} />
-          </label>
-          <label>
-            开始日期
-            <input aria-label="周期开始日期" type="date" value={cycleStartDate} onChange={(event) => setCycleStartDate(event.target.value)} />
-          </label>
-          <label>
-            结束日期
-            <input aria-label="周期结束日期" type="date" value={cycleEndDate} onChange={(event) => setCycleEndDate(event.target.value)} />
-          </label>
-          <label>
-            状态
-            <select value={cycleStatus} onChange={(event) => setCycleStatus(event.target.value as "DRAFT" | "ACTIVE" | "CLOSED")}>
-              <option value="DRAFT">DRAFT</option>
-              <option value="ACTIVE">ACTIVE</option>
-              <option value="CLOSED">CLOSED</option>
-            </select>
-          </label>
-          <button type="button" disabled={!canCreateCycle} onClick={() => void createCycle()}>
-            创建绩效周期
-          </button>
-        </div>
-      </section>
+      <PerformanceCyclesPanel
+        cycleName={cycleName}
+        onCycleNameChange={setCycleName}
+        cycleStartDate={cycleStartDate}
+        onCycleStartDateChange={setCycleStartDate}
+        cycleEndDate={cycleEndDate}
+        onCycleEndDateChange={setCycleEndDate}
+        cycleStatus={cycleStatus}
+        onCycleStatusChange={setCycleStatus}
+        canCreateCycle={canCreateCycle}
+        onCreateCycle={() => void createCycle()}
+        cycles={cycles}
+        editingCycleId={editingCycleId}
+        editingCycleName={editingCycleName}
+        onEditingCycleNameChange={setEditingCycleName}
+        editingCycleStartDate={editingCycleStartDate}
+        onEditingCycleStartDateChange={setEditingCycleStartDate}
+        editingCycleEndDate={editingCycleEndDate}
+        onEditingCycleEndDateChange={setEditingCycleEndDate}
+        editingCycleStatus={editingCycleStatus}
+        onEditingCycleStatusChange={setEditingCycleStatus}
+        canSaveCycle={canSaveCycle}
+        onBeginEditCycle={(cycleId) => {
+          const cycle = cycles.find((item) => item.id === cycleId);
+          if (cycle) {
+            beginEditCycle(cycle);
+          }
+        }}
+        onSaveCycle={(cycleId) => void saveEditCycle(cycleId)}
+        onCancelEditCycle={cancelEditCycle}
+        onRemoveCycle={(cycleId) => void removeCycle(cycleId)}
+      />
 
-      <section style={{ marginTop: "14px", border: "1px solid var(--border)", borderRadius: "12px", padding: "12px", background: "var(--surface)" }}>
-        <h2 style={{ marginTop: 0, fontSize: "16px" }}>新增绩效维度</h2>
-        <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
-          <label>
-            所属周期
-            <select
-              aria-label="维度所属周期"
-              value={dimensionCycleId}
-              onChange={(event) => setDimensionCycleId(event.target.value)}
-            >
-              <option value="">请选择</option>
-              {cycles.map((cycle) => (
-                <option key={cycle.id} value={cycle.id}>
-                  {cycle.name}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label>
-            维度Key
-            <input aria-label="维度Key" value={dimensionKey} onChange={(event) => setDimensionKey(event.target.value)} />
-          </label>
-          <label>
-            维度名称
-            <input aria-label="维度名称" value={dimensionName} onChange={(event) => setDimensionName(event.target.value)} />
-          </label>
-          <label>
-            权重
-            <input aria-label="维度权重" type="number" min={1} max={100} value={dimensionWeight} onChange={(event) => setDimensionWeight(event.target.value)} />
-          </label>
-          <label>
-            指标说明
-            <input aria-label="维度指标说明" value={dimensionMetricHint} onChange={(event) => setDimensionMetricHint(event.target.value)} />
-          </label>
-          <button type="button" disabled={!canCreateDimension} onClick={() => void createDimension()}>
-            新增绩效维度
-          </button>
-        </div>
-      </section>
+      <PerformanceDimensionsPanel
+        dimensionCycleId={dimensionCycleId}
+        onDimensionCycleIdChange={setDimensionCycleId}
+        dimensionKey={dimensionKey}
+        onDimensionKeyChange={setDimensionKey}
+        dimensionName={dimensionName}
+        onDimensionNameChange={setDimensionName}
+        dimensionWeight={dimensionWeight}
+        onDimensionWeightChange={setDimensionWeight}
+        dimensionMetricHint={dimensionMetricHint}
+        onDimensionMetricHintChange={setDimensionMetricHint}
+        canCreateDimension={canCreateDimension}
+        onCreateDimension={() => void createDimension()}
+        cycles={cycles}
+        editingDimensionId={editingDimensionId}
+        editingDimensionKey={editingDimensionKey}
+        onEditingDimensionKeyChange={setEditingDimensionKey}
+        editingDimensionName={editingDimensionName}
+        onEditingDimensionNameChange={setEditingDimensionName}
+        editingDimensionWeight={editingDimensionWeight}
+        onEditingDimensionWeightChange={setEditingDimensionWeight}
+        editingDimensionMetricHint={editingDimensionMetricHint}
+        onEditingDimensionMetricHintChange={setEditingDimensionMetricHint}
+        canSaveDimension={canSaveDimension}
+        onBeginEditDimension={(dimensionId) => {
+          const dimension = cycles
+            .flatMap((cycle) => cycle.dimensions)
+            .find((item) => item.id === dimensionId);
+          if (dimension) {
+            beginEditDimension(dimension);
+          }
+        }}
+        onSaveDimension={(dimensionId) => void saveEditDimension(dimensionId)}
+        onCancelEditDimension={cancelEditDimension}
+        onRemoveDimension={(dimensionId) => void removeDimension(dimensionId)}
+      />
 
-      <section style={{ marginTop: "14px", border: "1px solid var(--border)", borderRadius: "12px", padding: "12px", background: "var(--surface)" }}>
-        <h2 style={{ marginTop: 0, fontSize: "16px" }}>当前草案周期</h2>
-        {cycles.length === 0 ? <p style={{ marginBottom: 0 }}>暂无草案周期</p> : null}
-        {cycles.map((cycle) => (
-          <article key={cycle.id} style={{ border: "1px solid var(--border)", borderRadius: "10px", padding: "10px", marginBottom: "10px" }}>
-            <div>
-              <strong>{cycle.name}</strong>
-              <span style={{ marginLeft: "8px", color: "var(--muted)" }}>
-                {cycle.startDate.slice(0, 10)} ~ {cycle.endDate.slice(0, 10)} / {cycle.status}
-              </span>
-            </div>
-            {editingCycleId === cycle.id ? (
-              <div style={{ display: "flex", gap: "8px", flexWrap: "wrap", marginTop: "10px" }}>
-                <label>
-                  周期名称
-                  <input
-                    aria-label={`编辑周期名称-${cycle.id}`}
-                    value={editingCycleName}
-                    onChange={(event) => setEditingCycleName(event.target.value)}
-                  />
-                </label>
-                <label>
-                  开始日期
-                  <input
-                    aria-label={`编辑周期开始日期-${cycle.id}`}
-                    type="date"
-                    value={editingCycleStartDate}
-                    onChange={(event) => setEditingCycleStartDate(event.target.value)}
-                  />
-                </label>
-                <label>
-                  结束日期
-                  <input
-                    aria-label={`编辑周期结束日期-${cycle.id}`}
-                    type="date"
-                    value={editingCycleEndDate}
-                    onChange={(event) => setEditingCycleEndDate(event.target.value)}
-                  />
-                </label>
-                <label>
-                  状态
-                  <select
-                    value={editingCycleStatus}
-                    onChange={(event) => setEditingCycleStatus(event.target.value as "DRAFT" | "ACTIVE" | "CLOSED")}
-                  >
-                    <option value="DRAFT">DRAFT</option>
-                    <option value="ACTIVE">ACTIVE</option>
-                    <option value="CLOSED">CLOSED</option>
-                  </select>
-                </label>
-                <button
-                  type="button"
-                  disabled={!canSaveCycle}
-                  onClick={() => void saveEditCycle(cycle.id)}
-                  aria-label={`保存周期-${cycle.id}`}
-                >
-                  保存
-                </button>
-                <button type="button" onClick={cancelEditCycle} aria-label={`取消编辑周期-${cycle.id}`}>
-                  取消
-                </button>
-              </div>
-            ) : (
-              <div style={{ display: "flex", gap: "8px", marginTop: "10px" }}>
-                <button type="button" onClick={() => beginEditCycle(cycle)} aria-label={`编辑周期-${cycle.id}`}>
-                  编辑
-                </button>
-                <button type="button" onClick={() => void removeCycle(cycle.id)} aria-label={`删除周期-${cycle.id}`}>
-                  删除
-                </button>
-              </div>
-            )}
-            <ul style={{ marginBottom: 0 }}>
-              {cycle.dimensions.map((dimension) => (
-                <li key={dimension.id}>
-                  {editingDimensionId === dimension.id ? (
-                    <div style={{ display: "flex", gap: "8px", flexWrap: "wrap", marginTop: "8px" }}>
-                      <label>
-                        维度Key
-                        <input
-                          aria-label={`编辑维度Key-${dimension.id}`}
-                          value={editingDimensionKey}
-                          onChange={(event) => setEditingDimensionKey(event.target.value)}
-                        />
-                      </label>
-                      <label>
-                        维度名称
-                        <input
-                          aria-label={`编辑维度名称-${dimension.id}`}
-                          value={editingDimensionName}
-                          onChange={(event) => setEditingDimensionName(event.target.value)}
-                        />
-                      </label>
-                      <label>
-                        权重
-                        <input
-                          aria-label={`编辑维度权重-${dimension.id}`}
-                          type="number"
-                          min={1}
-                          max={100}
-                          value={editingDimensionWeight}
-                          onChange={(event) => setEditingDimensionWeight(event.target.value)}
-                        />
-                      </label>
-                      <label>
-                        指标说明
-                        <input
-                          aria-label={`编辑维度指标说明-${dimension.id}`}
-                          value={editingDimensionMetricHint}
-                          onChange={(event) => setEditingDimensionMetricHint(event.target.value)}
-                        />
-                      </label>
-                      <button
-                        type="button"
-                        disabled={!canSaveDimension}
-                        onClick={() => void saveEditDimension(dimension.id)}
-                        aria-label={`保存维度-${dimension.id}`}
-                      >
-                        保存
-                      </button>
-                      <button
-                        type="button"
-                        onClick={cancelEditDimension}
-                        aria-label={`取消编辑维度-${dimension.id}`}
-                      >
-                        取消
-                      </button>
-                    </div>
-                  ) : (
-                    <>
-                      {dimension.name}（{dimension.weight}%）：{dimension.metricHint}
-                      <div style={{ display: "inline-flex", gap: "8px", marginLeft: "8px" }}>
-                        <button
-                          type="button"
-                          onClick={() => beginEditDimension(dimension)}
-                          aria-label={`编辑维度-${dimension.id}`}
-                        >
-                          编辑
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => void removeDimension(dimension.id)}
-                          aria-label={`删除维度-${dimension.id}`}
-                        >
-                          删除
-                        </button>
-                      </div>
-                    </>
-                  )}
-                </li>
-              ))}
-            </ul>
-          </article>
-        ))}
-      </section>
-
-      <section style={{ marginTop: "14px", border: "1px solid var(--border)", borderRadius: "12px", padding: "12px", background: "var(--surface)" }}>
-        <h2 style={{ marginTop: 0, fontSize: "16px" }}>待办清单（占位）</h2>
-        {todos.length === 0 ? <p style={{ marginBottom: 0 }}>暂无待办</p> : null}
-        <ul style={{ margin: 0 }}>
-          {todos.map((todo) => (
-            <li key={todo.id}>
-              <label>
-                <input
-                  aria-label={`待办完成-${todo.id}`}
-                  type="checkbox"
-                  checked={todo.done}
-                  onChange={(event) => void updateTodoDone(todo.id, event.target.checked)}
-                />
-                [{todo.ownerRole}] {todo.title} {todo.done ? "(已完成)" : "(待确认)"}
-              </label>
-            </li>
-          ))}
-        </ul>
-      </section>
+      <PerformanceTodosPanel
+        todos={todos}
+        onUpdateTodoDone={(todoId, done) => void updateTodoDone(todoId, done)}
+      />
 
       <footer style={{ marginTop: "14px", color: "var(--muted)", fontSize: "13px" }}>
         当前用户：{sessionUser?.username ?? "未知"} | 返回审批台：<a href="/manager/reviews">/manager/reviews</a>

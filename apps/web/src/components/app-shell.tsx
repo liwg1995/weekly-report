@@ -49,6 +49,7 @@ export default function AppShell({ workspace, pageTitle, pageDescription, childr
   const roles = user?.roles ?? [];
   const capabilities = getAllowedCapabilitiesForRoles(roles);
   const resolvedWorkspace = workspace ?? getPreferredWorkspace(roles);
+  const currentPath = typeof window !== "undefined" ? window.location.pathname : "";
   const activeRole = readActiveRole();
   const selectedRole =
     activeRole && roles.includes(activeRole) ? activeRole : roles[0] ?? "";
@@ -66,7 +67,12 @@ export default function AppShell({ workspace, pageTitle, pageDescription, childr
         </div>
         <nav className="shell-nav" aria-label="主导航">
           {navItems.map((item) => (
-            <a key={item.href} href={item.href} className="shell-nav-item">
+            <a
+              key={item.href}
+              href={item.href}
+              className={`shell-nav-item${currentPath === item.href ? " is-active" : ""}`}
+              aria-current={currentPath === item.href ? "page" : undefined}
+            >
               {item.label}
             </a>
           ))}

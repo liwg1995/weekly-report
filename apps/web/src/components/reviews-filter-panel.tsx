@@ -72,9 +72,9 @@ type Props = {
 
 export default function ReviewsFilterPanel(props: Props) {
   return (
-    <section style={{ marginBottom: "12px", padding: "12px" }}>
+    <section className="reviews-filter-panel" style={{ marginBottom: "12px", padding: "12px" }}>
       <h2 style={{ marginTop: 0, fontSize: "16px" }}>列表筛选</h2>
-      <div style={{ display: "flex", flexWrap: "wrap", gap: "8px", alignItems: "center" }}>
+      <div className="reviews-filter-controls" style={{ display: "flex", flexWrap: "wrap", gap: "8px", alignItems: "center" }}>
         <input
           aria-label="周报关键词"
           placeholder="关键词（内容/姓名/账号）"

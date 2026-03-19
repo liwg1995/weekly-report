@@ -21,7 +21,10 @@ export default function PerformanceTodosPanel(props: Props) {
         background: "var(--surface)"
       }}
     >
-      <h2 style={{ marginTop: 0, fontSize: "16px" }}>待办清单（占位）</h2>
+      <div className="ui-section-head">
+        <h2>待办清单（占位）</h2>
+        <p className="ui-section-desc">用于追踪绩效配置推进状态，后续可接入提醒机制。</p>
+      </div>
       {props.todos.length === 0 ? <p style={{ marginBottom: 0 }}>暂无待办</p> : null}
       <ul style={{ margin: 0 }}>
         {props.todos.map((todo) => (

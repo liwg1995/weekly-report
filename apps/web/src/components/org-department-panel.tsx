@@ -49,7 +49,10 @@ type Props = {
 export default function OrgDepartmentPanel(props: Props) {
   return (
     <section style={{ border: "1px solid var(--border)", borderRadius: "12px", padding: "12px" }}>
-      <h2 style={{ marginTop: 0 }}>部门设置</h2>
+      <div className="ui-section-head">
+        <h2>部门设置</h2>
+        <p className="ui-section-desc">先创建部门结构，再配置负责人与默认周报提交日。</p>
+      </div>
       <form onSubmit={props.submitCreateDepartment} style={{ display: "grid", gap: "8px" }}>
         <FormField label="部门名称">
           <input
@@ -99,6 +102,9 @@ export default function OrgDepartmentPanel(props: Props) {
         <button type="submit">创建部门</button>
       </form>
 
+      <p className="ui-section-desc" style={{ margin: "10px 0 8px" }}>
+        支持按关键词分页查看部门，并在列表里直接调整提交日。
+      </p>
       <FilterBar>
         <input
           placeholder="搜索部门"

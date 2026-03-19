@@ -47,7 +47,10 @@ export default function PerformanceCyclesPanel(props: Props) {
           background: "var(--surface)"
         }}
       >
-        <h2 style={{ marginTop: 0, fontSize: "16px" }}>配置绩效周期</h2>
+        <div className="ui-section-head">
+          <h2>配置绩效周期</h2>
+          <p className="ui-section-desc">先定义周期时间范围与状态，后续维度会绑定到对应周期。</p>
+        </div>
         <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
           <label>
             周期名称
@@ -103,7 +106,10 @@ export default function PerformanceCyclesPanel(props: Props) {
           background: "var(--surface)"
         }}
       >
-        <h2 style={{ marginTop: 0, fontSize: "16px" }}>当前草案周期</h2>
+        <div className="ui-section-head">
+          <h2>当前草案周期</h2>
+          <p className="ui-section-desc">支持直接编辑和删除，便于迭代调整考核窗口。</p>
+        </div>
         {props.cycles.length === 0 ? <p style={{ marginBottom: 0 }}>暂无草案周期</p> : null}
         {props.cycles.map((cycle) => (
           <article

@@ -54,7 +54,10 @@ export default function PerformanceDimensionsPanel(props: Props) {
         background: "var(--surface)"
       }}
     >
-      <h2 style={{ marginTop: 0, fontSize: "16px" }}>新增绩效维度</h2>
+      <div className="ui-section-head">
+        <h2>新增绩效维度</h2>
+        <p className="ui-section-desc">建议先确定 3-5 个核心维度，再逐步完善权重与指标说明。</p>
+      </div>
       <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
         <label>
           所属周期
@@ -114,15 +117,7 @@ export default function PerformanceDimensionsPanel(props: Props) {
       <div style={{ marginTop: "10px" }}>
         {props.cycles.length === 0 ? <p style={{ marginBottom: 0 }}>暂无周期维度</p> : null}
         {props.cycles.map((cycle) => (
-          <article
-            key={cycle.id}
-            style={{
-              border: "1px dashed var(--border)",
-              borderRadius: "10px",
-              padding: "10px",
-              marginBottom: "10px"
-            }}
-          >
+          <article key={cycle.id} className="ui-subsection-card">
             <div style={{ fontWeight: 600, marginBottom: "6px" }}>{cycle.name}</div>
             {cycle.dimensions.length === 0 ? <p style={{ margin: 0 }}>暂无维度</p> : null}
             <ul style={{ marginBottom: 0 }}>

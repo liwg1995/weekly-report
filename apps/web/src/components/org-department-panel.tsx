@@ -99,7 +99,7 @@ export default function OrgDepartmentPanel(props: Props) {
             ))}
           </select>
         </FormField>
-        <button type="submit">创建部门</button>
+        <button type="submit" className="btn-primary">创建部门</button>
       </form>
 
       <p className="ui-section-desc" style={{ margin: "10px 0 8px" }}>

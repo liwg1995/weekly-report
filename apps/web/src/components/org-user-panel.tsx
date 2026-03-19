@@ -89,7 +89,7 @@ export default function OrgUserPanel(props: Props) {
               </option>
             ))}
           </select>
-          <button type="submit">创建员工</button>
+          <button type="submit" className="btn-primary">创建员工</button>
         </form>
       </div>
 
@@ -130,7 +130,7 @@ export default function OrgUserPanel(props: Props) {
             />
             设为主部门
           </label>
-          <button type="submit">保存员工归属</button>
+          <button type="submit" className="btn-primary">保存员工归属</button>
         </form>
       </div>
 
@@ -153,7 +153,7 @@ export default function OrgUserPanel(props: Props) {
               </option>
             ))}
           </select>
-          <button type="submit">设置直属领导</button>
+          <button type="submit" className="btn-primary">设置直属领导</button>
         </form>
       </div>
 

@@ -97,6 +97,28 @@ button:focus-visible {
   box-shadow: var(--focus-ring);
 }
 
+.btn-primary {
+  background: var(--primary);
+  color: #fff;
+  border-color: var(--primary);
+}
+
+.btn-primary:hover {
+  background: var(--primary-strong);
+  border-color: var(--primary-strong);
+}
+
+.btn-danger {
+  background: #fff2f2;
+  color: #b42318;
+  border-color: #f3b8b8;
+}
+
+.btn-danger:hover {
+  background: #ffe7e7;
+  border-color: #ea9a9a;
+}
+
 button:disabled {
   cursor: not-allowed;
   opacity: 0.65;

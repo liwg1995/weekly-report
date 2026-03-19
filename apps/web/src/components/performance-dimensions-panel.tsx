@@ -109,7 +109,7 @@ export default function PerformanceDimensionsPanel(props: Props) {
             onChange={(event) => props.onDimensionMetricHintChange(event.target.value)}
           />
         </label>
-        <button type="button" disabled={!props.canCreateDimension} onClick={props.onCreateDimension}>
+        <button type="button" className="btn-primary" disabled={!props.canCreateDimension} onClick={props.onCreateDimension}>
           新增绩效维度
         </button>
       </div>
@@ -162,6 +162,7 @@ export default function PerformanceDimensionsPanel(props: Props) {
                       </label>
                       <button
                         type="button"
+                        className="btn-primary"
                         disabled={!props.canSaveDimension}
                         onClick={() => props.onSaveDimension(dimension.id)}
                         aria-label={`保存维度-${dimension.id}`}
@@ -189,6 +190,7 @@ export default function PerformanceDimensionsPanel(props: Props) {
                         </button>
                         <button
                           type="button"
+                          className="btn-danger"
                           onClick={() => props.onRemoveDimension(dimension.id)}
                           aria-label={`删除维度-${dimension.id}`}
                         >

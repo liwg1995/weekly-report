@@ -91,7 +91,7 @@ export default function PerformanceCyclesPanel(props: Props) {
               <option value="CLOSED">CLOSED</option>
             </select>
           </label>
-          <button type="button" disabled={!props.canCreateCycle} onClick={props.onCreateCycle}>
+          <button type="button" className="btn-primary" disabled={!props.canCreateCycle} onClick={props.onCreateCycle}>
             创建绩效周期
           </button>
         </div>
@@ -172,6 +172,7 @@ export default function PerformanceCyclesPanel(props: Props) {
                 </label>
                 <button
                   type="button"
+                  className="btn-primary"
                   disabled={!props.canSaveCycle}
                   onClick={() => props.onSaveCycle(cycle.id)}
                   aria-label={`保存周期-${cycle.id}`}
@@ -197,6 +198,7 @@ export default function PerformanceCyclesPanel(props: Props) {
                 </button>
                 <button
                   type="button"
+                  className="btn-danger"
                   onClick={() => props.onRemoveCycle(cycle.id)}
                   aria-label={`删除周期-${cycle.id}`}
                 >

@@ -201,10 +201,10 @@ export default function ReviewsFilterPanel(props: Props) {
         <button type="button" onClick={props.onOnlyMyDirect}>
           仅我直属团队
         </button>
-        <button type="button" onClick={props.onSearch}>
+        <button type="button" className="btn-primary" onClick={props.onSearch}>
           查询
         </button>
-        <button type="button" onClick={props.onSaveDefaults}>
+        <button type="button" className="btn-primary" onClick={props.onSaveDefaults}>
           保存为默认筛选
         </button>
         <button type="button" onClick={props.onRestoreDefaults}>

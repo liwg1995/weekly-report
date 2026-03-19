@@ -59,10 +59,10 @@ export default function ReviewsPendingPanel(props: Props) {
             <button type="button" onClick={props.onClearSelection}>
               取消全选
             </button>
-            <button type="button" onClick={props.onBatchApprove}>
+            <button type="button" className="btn-primary" onClick={props.onBatchApprove}>
               批量通过
             </button>
-            <button type="button" onClick={props.onBatchReject}>
+            <button type="button" className="btn-danger" onClick={props.onBatchReject}>
               批量驳回
             </button>
           </div>
@@ -105,10 +105,10 @@ export default function ReviewsPendingPanel(props: Props) {
                   </div>
                 ) : null}
                 <div style={{ display: "flex", gap: "8px", marginTop: "10px" }}>
-                  <button type="button" onClick={() => props.onApproveItem(item.id)}>
+                  <button type="button" className="btn-primary" onClick={() => props.onApproveItem(item.id)}>
                     通过
                   </button>
-                  <button type="button" onClick={() => props.onRejectItem(item.id)}>
+                  <button type="button" className="btn-danger" onClick={() => props.onRejectItem(item.id)}>
                     驳回
                   </button>
                 </div>
@@ -161,7 +161,7 @@ export default function ReviewsPendingPanel(props: Props) {
             }}
           />
           <div style={{ display: "flex", gap: "8px", marginTop: "8px" }}>
-            <button type="button" onClick={props.onConfirmReject}>
+            <button type="button" className="btn-danger" onClick={props.onConfirmReject}>
               确认驳回
             </button>
             <button type="button" onClick={props.onCancelReject}>

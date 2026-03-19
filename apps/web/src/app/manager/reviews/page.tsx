@@ -14,6 +14,7 @@ import ReviewsLogsPanel from "../../../components/reviews-logs-panel";
 import ReviewsExportHistoryPanel from "../../../components/reviews-export-history-panel";
 import ReviewsTemplatesPanel from "../../../components/reviews-templates-panel";
 import ReviewsPendingPanel from "../../../components/reviews-pending-panel";
+import ReviewsFilterPanel from "../../../components/reviews-filter-panel";
 import SessionExpiryNotice from "../../../components/session-expiry-notice";
 import { useAuthGuard } from "../../../lib/use-auth-guard";
 import "./reviews.css";
@@ -1860,572 +1861,363 @@ export default function ManagerReviewsPage() {
         rangeTrendText={rangeTrendText}
         onRangeChange={setStatsRange}
       />
-      <section style={{ marginBottom: "12px", padding: "12px" }}>
-        <h2 style={{ marginTop: 0, fontSize: "16px" }}>列表筛选</h2>
-        <div style={{ display: "flex", flexWrap: "wrap", gap: "8px", alignItems: "center" }}>
-          <input
-            aria-label="周报关键词"
-            placeholder="关键词（内容/姓名/账号）"
-            value={listKeywordInput}
-            onChange={(event) => setListKeywordInput(event.target.value)}
-          />
-          <select
-            aria-label="每页条数"
-            value={String(listPageSize)}
-            onChange={(event) => {
-              const nextSize = Number(event.target.value);
-              void loadPendingReports({
-                page: 1,
-                pageSize: nextSize,
-                keyword: listKeywordInput.trim(),
-                departmentId: listDepartmentId,
-                leaderUserId: listLeaderUserId,
-                overdueFirst: listOverdueFirst
-              });
-            }}
-          >
-            <option value="10">10条/页</option>
-            <option value="20">20条/页</option>
-            <option value="50">50条/页</option>
-          </select>
-          <select
-            aria-label="部门筛选"
-            value={listDepartmentId ? String(listDepartmentId) : ""}
-            onChange={(event) => {
-              const value = event.target.value;
-              setListDepartmentId(value ? Number(value) : undefined);
-            }}
-          >
-            <option value="">全部部门</option>
-            {filteredDepartments.map((dept) => (
-              <option key={dept.id} value={String(dept.id)}>
-                {dept.name}
-              </option>
-            ))}
-          </select>
-          <input
-            aria-label="部门选项搜索"
-            placeholder="搜索部门"
-            value={filterDepartmentKeyword}
-            onChange={(event) => setFilterDepartmentKeyword(event.target.value)}
-            style={{ width: "120px" }}
-          />
-          <select
-            aria-label="直属领导筛选"
-            value={listLeaderUserId ? String(listLeaderUserId) : ""}
-            onChange={(event) => {
-              const value = event.target.value;
-              setListLeaderUserId(value ? Number(value) : undefined);
-            }}
-          >
-            <option value="">全部直属领导</option>
-            {filteredLeaders.map((leader) => (
-              <option key={leader.id} value={String(leader.id)}>
-                {leader.realName}（{leader.username}）
-              </option>
-            ))}
-          </select>
-          <input
-            aria-label="直属领导选项搜索"
-            placeholder="搜索领导"
-            value={filterLeaderKeyword}
-            onChange={(event) => setFilterLeaderKeyword(event.target.value)}
-            style={{ width: "120px" }}
-          />
-          <button
-            type="button"
-            onClick={() => void loadFilterOptions({ force: true })}
-            disabled={filterOptionsLoading}
-          >
-            {filterOptionsLoading
-              ? "加载中..."
-              : filterDepartments.length > 0 || filterLeaders.length > 0
-                ? "刷新筛选项"
-                : "加载筛选项"}
-          </button>
-          <span style={{ color: "var(--muted)", fontSize: "12px" }}>
-            筛选项刷新：{filterOptionsUpdatedAtText}
-          </span>
-          <label>
-            <input
-              type="checkbox"
-              aria-label="逾期优先"
-              checked={listOverdueFirst}
-              onChange={(event) => {
-                const checked = event.target.checked;
-                setListOverdueFirst(checked);
-                setListSortMode(checked ? "overdueFirst" : deriveSortMode(false, listMentionFirst));
-              }}
-            />{" "}
-            逾期优先
-          </label>
-          <label>
-            <input
-              type="checkbox"
-              aria-label="@领导提醒"
-              checked={listMentionLeaderOnly}
-              onChange={(event) => setListMentionLeaderOnly(event.target.checked)}
-            />{" "}
-            @领导提醒
-          </label>
-          <label>
-            <input
-              type="checkbox"
-              aria-label="提醒优先"
-              checked={listMentionFirst}
-              onChange={(event) => {
-                const checked = event.target.checked;
-                setListMentionFirst(checked);
-                setListSortMode(deriveSortMode(listOverdueFirst, checked));
-              }}
-            />{" "}
-            提醒优先
-          </label>
-          <label>
-            <input
-              type="checkbox"
-              aria-label="仅我直属团队"
-              checked={listMyDirectOnly}
-              onChange={(event) => setListMyDirectOnly(event.target.checked)}
-            />{" "}
-            仅我直属团队
-          </label>
-          <select
-            aria-label="审批排序"
-            value={listSortMode}
-            onChange={(event) => {
-              const nextMode = event.target.value as ReviewSortMode;
-              const nextOverdueFirst = nextMode === "overdueFirst";
-              const nextMentionFirst = nextMode === "mentionFirst";
-              setListSortMode(nextMode);
-              setListOverdueFirst(nextOverdueFirst);
-              setListMentionFirst(nextMentionFirst);
-              void loadPendingReports({
-                page: 1,
-                pageSize: listPageSize,
-                keyword: listKeywordInput.trim(),
-                departmentId: listDepartmentId,
-                leaderUserId: listLeaderUserId,
-                overdueFirst: nextOverdueFirst,
-                mentionLeaderOnly: listMentionLeaderOnly,
-                mentionFirst: nextMentionFirst,
-                myDirectOnly: listMyDirectOnly
-              });
-            }}
-          >
-            <option value="default">默认顺序</option>
-            <option value="mentionFirst">提醒优先</option>
-            <option value="overdueFirst">逾期优先</option>
-          </select>
-          <button
-            type="button"
-            onClick={() => {
-              setListSortMode("mentionFirst");
-              setListOverdueFirst(false);
-              setListMentionLeaderOnly(false);
-              setListMentionFirst(true);
-              setListMyDirectOnly(true);
-              void loadPendingReports({
-                page: 1,
-                pageSize: listPageSize,
-                keyword: listKeywordInput.trim(),
-                departmentId: listDepartmentId,
-                leaderUserId: listLeaderUserId,
-                overdueFirst: false,
-                mentionLeaderOnly: false,
-                mentionFirst: true,
-                myDirectOnly: true
-              });
-            }}
-          >
-            待我审批预设
-          </button>
-          <button
-            type="button"
-            onClick={() => {
-              setListSortMode("mentionFirst");
-              setListOverdueFirst(false);
-              setListMentionLeaderOnly(true);
-              setListMentionFirst(true);
-              void loadPendingReports({
-                page: 1,
-                pageSize: listPageSize,
-                keyword: listKeywordInput.trim(),
-                departmentId: listDepartmentId,
-                leaderUserId: listLeaderUserId,
-                overdueFirst: false,
-                mentionLeaderOnly: true,
-                mentionFirst: true,
-                myDirectOnly: listMyDirectOnly
-              });
-            }}
-          >
-            @提醒优先预设
-          </button>
-          <button
-            type="button"
-            onClick={() => {
-              setListOverdueFirst(true);
-              setListSortMode("overdueFirst");
-              void loadPendingReports({
-                page: 1,
-                pageSize: listPageSize,
-                keyword: listKeywordInput.trim(),
-                departmentId: listDepartmentId,
-                leaderUserId: listLeaderUserId,
-                overdueFirst: true,
-                mentionLeaderOnly: listMentionLeaderOnly,
-                mentionFirst: listMentionFirst,
-                myDirectOnly: listMyDirectOnly
-              });
-            }}
-          >
-            只看逾期
-          </button>
-          <button
-            type="button"
-            onClick={() => {
-              setListMentionLeaderOnly(true);
-              void loadPendingReports({
-                page: 1,
-                pageSize: listPageSize,
-                keyword: listKeywordInput.trim(),
-                departmentId: listDepartmentId,
-                leaderUserId: listLeaderUserId,
-                overdueFirst: listOverdueFirst,
-                mentionLeaderOnly: true,
-                mentionFirst: listMentionFirst,
-                myDirectOnly: listMyDirectOnly
-              });
-            }}
-          >
-            只看@领导提醒
-          </button>
-          <button
-            type="button"
-            onClick={() => {
-              setListMentionFirst(true);
-              setListSortMode("mentionFirst");
-              void loadPendingReports({
-                page: 1,
-                pageSize: listPageSize,
-                keyword: listKeywordInput.trim(),
-                departmentId: listDepartmentId,
-                leaderUserId: listLeaderUserId,
-                overdueFirst: listOverdueFirst,
-                mentionLeaderOnly: listMentionLeaderOnly,
-                mentionFirst: true,
-                myDirectOnly: listMyDirectOnly
-              });
-            }}
-          >
-            提醒优先排序
-          </button>
-          <button
-            type="button"
-            onClick={() => {
-              setListMyDirectOnly(true);
-              void loadPendingReports({
-                page: 1,
-                pageSize: listPageSize,
-                keyword: listKeywordInput.trim(),
-                departmentId: listDepartmentId,
-                leaderUserId: listLeaderUserId,
-                overdueFirst: listOverdueFirst,
-                mentionLeaderOnly: listMentionLeaderOnly,
-                mentionFirst: listMentionFirst,
-                myDirectOnly: true
-              });
-            }}
-          >
-            仅我直属团队
-          </button>
-          <button
-            type="button"
-            onClick={() => {
-              const nextKeyword = listKeywordInput.trim();
-              setListKeyword(nextKeyword);
-              void loadPendingReports({
-                page: 1,
-                pageSize: listPageSize,
-                keyword: nextKeyword,
-                departmentId: listDepartmentId,
-                leaderUserId: listLeaderUserId,
-                overdueFirst: listOverdueFirst,
-                mentionLeaderOnly: listMentionLeaderOnly,
-                mentionFirst: listMentionFirst,
-                myDirectOnly: listMyDirectOnly
-              });
-            }}
-          >
-            查询
-          </button>
-          <button
-            type="button"
-            onClick={() => {
-              persistListDefaults({
-                pageSize: listPageSize,
-                keyword: listKeywordInput.trim(),
-                departmentId: listDepartmentId,
-                leaderUserId: listLeaderUserId,
-                overdueFirst: listOverdueFirst,
-                mentionLeaderOnly: listMentionLeaderOnly,
-                mentionFirst: listMentionFirst,
-                myDirectOnly: listMyDirectOnly
-              });
-              setNotice("已保存为默认筛选");
-            }}
-          >
-            保存为默认筛选
-          </button>
-          <button
-            type="button"
-            onClick={() => {
-              const next = readListFilterDefaults();
-              setListPageSize(next.pageSize);
-              setListKeywordInput(next.keyword);
-              setListKeyword(next.keyword);
-              setListDepartmentId(next.departmentId);
-              setListLeaderUserId(next.leaderUserId);
-              setListOverdueFirst(next.overdueFirst);
-              setListMentionLeaderOnly(next.mentionLeaderOnly);
-              setListMentionFirst(next.mentionFirst);
-              setListSortMode(deriveSortMode(next.overdueFirst, next.mentionFirst));
-              setListMyDirectOnly(next.myDirectOnly);
-              void loadPendingReports({
-                page: 1,
-                pageSize: next.pageSize,
-                keyword: next.keyword,
-                departmentId: next.departmentId,
-                leaderUserId: next.leaderUserId,
-                overdueFirst: next.overdueFirst,
-                mentionLeaderOnly: next.mentionLeaderOnly,
-                mentionFirst: next.mentionFirst,
-                myDirectOnly: next.myDirectOnly
-              });
-            }}
-          >
-            恢复默认筛选
-          </button>
-          <button
-            type="button"
-            onClick={() => {
-              setListKeywordInput("");
-              setListKeyword("");
-              setListDepartmentId(undefined);
-              setListLeaderUserId(undefined);
-              setListOverdueFirst(false);
-              setListMentionLeaderOnly(false);
-              setListMentionFirst(false);
-              setListSortMode("default");
-              setListMyDirectOnly(false);
-              void loadPendingReports({
-                page: 1,
-                pageSize: listPageSize,
-                keyword: "",
-                departmentId: undefined,
-                leaderUserId: undefined,
-                overdueFirst: false,
-                mentionLeaderOnly: false,
-                mentionFirst: false,
-                myDirectOnly: false
-              });
-            }}
-          >
-            重置
-          </button>
-          <span style={{ color: "var(--muted)", fontSize: "12px" }}>
-            第 {listPage} / {listTotalPages} 页，显示 {listStart}-{listEnd} / {totalItems}
-          </span>
-          <span style={{ color: "var(--muted)", fontSize: "12px" }}>
-            默认：{savedListDefaults.pageSize}条
-          </span>
-        </div>
-        {activeFilterTags.length > 0 ? (
-          <div className="review-filter-tags">
-            {listKeyword ? (
-              <button
-                type="button"
-                className="review-filter-tag"
-                onClick={() => {
-                  setListKeywordInput("");
-                  setListKeyword("");
-                  void loadPendingReports({
-                    page: 1,
-                    pageSize: listPageSize,
-                    keyword: "",
-                    departmentId: listDepartmentId,
-                    leaderUserId: listLeaderUserId,
-                    overdueFirst: listOverdueFirst,
-                    mentionFirst: listMentionFirst,
-                    myDirectOnly: listMyDirectOnly
-                  });
-                }}
-              >
-                关键词：{listKeyword} ×
-              </button>
-            ) : null}
-            {selectedDepartmentLabel ? (
-              <button
-                type="button"
-                className="review-filter-tag"
-                onClick={() => {
-                  setListDepartmentId(undefined);
-                  void loadPendingReports({
-                    page: 1,
-                    pageSize: listPageSize,
-                    keyword: listKeyword,
-                    departmentId: undefined,
-                    leaderUserId: listLeaderUserId,
-                    overdueFirst: listOverdueFirst,
-                    mentionFirst: listMentionFirst,
-                    myDirectOnly: listMyDirectOnly
-                  });
-                }}
-              >
-                部门：{selectedDepartmentLabel} ×
-              </button>
-            ) : null}
-            {selectedLeader ? (
-              <button
-                type="button"
-                className="review-filter-tag"
-                onClick={() => {
-                  setListLeaderUserId(undefined);
-                  void loadPendingReports({
-                    page: 1,
-                    pageSize: listPageSize,
-                    keyword: listKeyword,
-                    departmentId: listDepartmentId,
-                    leaderUserId: undefined,
-                    overdueFirst: listOverdueFirst,
-                    mentionFirst: listMentionFirst,
-                    myDirectOnly: listMyDirectOnly
-                  });
-                }}
-              >
-                直属领导：{selectedLeader.realName}（{selectedLeader.username}） ×
-              </button>
-            ) : null}
-            {listOverdueFirst ? (
-              <button
-                type="button"
-                className="review-filter-tag"
-                onClick={() => {
-                  setListOverdueFirst(false);
-                  void loadPendingReports({
-                    page: 1,
-                    pageSize: listPageSize,
-                    keyword: listKeyword,
-                    departmentId: listDepartmentId,
-                    leaderUserId: listLeaderUserId,
-                    overdueFirst: false,
-                    mentionLeaderOnly: listMentionLeaderOnly,
-                    mentionFirst: listMentionFirst,
-                    myDirectOnly: listMyDirectOnly
-                  });
-                }}
-              >
-                逾期优先 ×
-              </button>
-            ) : null}
-            {listMentionLeaderOnly ? (
-              <button
-                type="button"
-                className="review-filter-tag"
-                onClick={() => {
-                  setListMentionLeaderOnly(false);
-                  void loadPendingReports({
-                    page: 1,
-                    pageSize: listPageSize,
-                    keyword: listKeyword,
-                    departmentId: listDepartmentId,
-                    leaderUserId: listLeaderUserId,
-                    overdueFirst: listOverdueFirst,
-                    mentionLeaderOnly: false,
-                    mentionFirst: listMentionFirst,
-                    myDirectOnly: listMyDirectOnly
-                  });
-                }}
-              >
-                @领导提醒 ×
-              </button>
-            ) : null}
-            {listMentionFirst ? (
-              <button
-                type="button"
-                className="review-filter-tag"
-                onClick={() => {
-                  setListMentionFirst(false);
-                  void loadPendingReports({
-                    page: 1,
-                    pageSize: listPageSize,
-                    keyword: listKeyword,
-                    departmentId: listDepartmentId,
-                    leaderUserId: listLeaderUserId,
-                    overdueFirst: listOverdueFirst,
-                    mentionLeaderOnly: listMentionLeaderOnly,
-                    mentionFirst: false,
-                    myDirectOnly: listMyDirectOnly
-                  });
-                }}
-              >
-                提醒优先排序 ×
-              </button>
-            ) : null}
-            {listMyDirectOnly ? (
-              <button
-                type="button"
-                className="review-filter-tag"
-                onClick={() => {
-                  setListMyDirectOnly(false);
-                  void loadPendingReports({
-                    page: 1,
-                    pageSize: listPageSize,
-                    keyword: listKeyword,
-                    departmentId: listDepartmentId,
-                    leaderUserId: listLeaderUserId,
-                    overdueFirst: listOverdueFirst,
-                    mentionLeaderOnly: listMentionLeaderOnly,
-                    mentionFirst: listMentionFirst,
-                    myDirectOnly: false
-                  });
-                }}
-              >
-                仅我直属团队 ×
-              </button>
-            ) : null}
-            <button
-              type="button"
-              className="review-filter-clear"
-              onClick={() => {
-                setListKeywordInput("");
-                setListKeyword("");
-                setListDepartmentId(undefined);
-                setListLeaderUserId(undefined);
-                setListOverdueFirst(false);
-                setListMentionLeaderOnly(false);
-                setListMentionFirst(false);
-                setListSortMode("default");
-                setListMyDirectOnly(false);
-                void loadPendingReports({
-                  page: 1,
-                  pageSize: listPageSize,
-                  keyword: "",
-                  departmentId: undefined,
-                  leaderUserId: undefined,
-                  overdueFirst: false,
-                  mentionLeaderOnly: false,
-                  mentionFirst: false,
-                  myDirectOnly: false
-                });
-              }}
-            >
-              清空全部筛选
-            </button>
-          </div>
-        ) : null}
-      </section>
+      <ReviewsFilterPanel
+        listKeywordInput={listKeywordInput}
+        onKeywordInputChange={setListKeywordInput}
+        listPageSize={listPageSize}
+        onPageSizeChange={(nextSize) =>
+          void loadPendingReports({
+            page: 1,
+            pageSize: nextSize,
+            keyword: listKeywordInput.trim(),
+            departmentId: listDepartmentId,
+            leaderUserId: listLeaderUserId,
+            overdueFirst: listOverdueFirst
+          })
+        }
+        listDepartmentId={listDepartmentId}
+        onDepartmentChange={setListDepartmentId}
+        filteredDepartments={filteredDepartments}
+        filterDepartmentKeyword={filterDepartmentKeyword}
+        onFilterDepartmentKeywordChange={setFilterDepartmentKeyword}
+        listLeaderUserId={listLeaderUserId}
+        onLeaderUserIdChange={setListLeaderUserId}
+        filteredLeaders={filteredLeaders}
+        filterLeaderKeyword={filterLeaderKeyword}
+        onFilterLeaderKeywordChange={setFilterLeaderKeyword}
+        filterOptionsLoading={filterOptionsLoading}
+        hasFilterOptions={filterDepartments.length > 0 || filterLeaders.length > 0}
+        onRefreshFilterOptions={() => void loadFilterOptions({ force: true })}
+        filterOptionsUpdatedAtText={filterOptionsUpdatedAtText}
+        listOverdueFirst={listOverdueFirst}
+        onOverdueFirstChange={(checked) => {
+          setListOverdueFirst(checked);
+          setListSortMode(checked ? "overdueFirst" : deriveSortMode(false, listMentionFirst));
+        }}
+        listMentionLeaderOnly={listMentionLeaderOnly}
+        onMentionLeaderOnlyChange={setListMentionLeaderOnly}
+        listMentionFirst={listMentionFirst}
+        onMentionFirstChange={(checked) => {
+          setListMentionFirst(checked);
+          setListSortMode(deriveSortMode(listOverdueFirst, checked));
+        }}
+        listMyDirectOnly={listMyDirectOnly}
+        onMyDirectOnlyChange={setListMyDirectOnly}
+        listSortMode={listSortMode}
+        onSortModeChange={(nextMode) => {
+          const nextOverdueFirst = nextMode === "overdueFirst";
+          const nextMentionFirst = nextMode === "mentionFirst";
+          setListSortMode(nextMode);
+          setListOverdueFirst(nextOverdueFirst);
+          setListMentionFirst(nextMentionFirst);
+          void loadPendingReports({
+            page: 1,
+            pageSize: listPageSize,
+            keyword: listKeywordInput.trim(),
+            departmentId: listDepartmentId,
+            leaderUserId: listLeaderUserId,
+            overdueFirst: nextOverdueFirst,
+            mentionLeaderOnly: listMentionLeaderOnly,
+            mentionFirst: nextMentionFirst,
+            myDirectOnly: listMyDirectOnly
+          });
+        }}
+        onPresetMyPending={() => {
+          setListSortMode("mentionFirst");
+          setListOverdueFirst(false);
+          setListMentionLeaderOnly(false);
+          setListMentionFirst(true);
+          setListMyDirectOnly(true);
+          void loadPendingReports({
+            page: 1,
+            pageSize: listPageSize,
+            keyword: listKeywordInput.trim(),
+            departmentId: listDepartmentId,
+            leaderUserId: listLeaderUserId,
+            overdueFirst: false,
+            mentionLeaderOnly: false,
+            mentionFirst: true,
+            myDirectOnly: true
+          });
+        }}
+        onPresetMentionPriority={() => {
+          setListSortMode("mentionFirst");
+          setListOverdueFirst(false);
+          setListMentionLeaderOnly(true);
+          setListMentionFirst(true);
+          void loadPendingReports({
+            page: 1,
+            pageSize: listPageSize,
+            keyword: listKeywordInput.trim(),
+            departmentId: listDepartmentId,
+            leaderUserId: listLeaderUserId,
+            overdueFirst: false,
+            mentionLeaderOnly: true,
+            mentionFirst: true,
+            myDirectOnly: listMyDirectOnly
+          });
+        }}
+        onOnlyOverdue={() => {
+          setListOverdueFirst(true);
+          setListSortMode("overdueFirst");
+          void loadPendingReports({
+            page: 1,
+            pageSize: listPageSize,
+            keyword: listKeywordInput.trim(),
+            departmentId: listDepartmentId,
+            leaderUserId: listLeaderUserId,
+            overdueFirst: true,
+            mentionLeaderOnly: listMentionLeaderOnly,
+            mentionFirst: listMentionFirst,
+            myDirectOnly: listMyDirectOnly
+          });
+        }}
+        onOnlyMentionLeader={() => {
+          setListMentionLeaderOnly(true);
+          void loadPendingReports({
+            page: 1,
+            pageSize: listPageSize,
+            keyword: listKeywordInput.trim(),
+            departmentId: listDepartmentId,
+            leaderUserId: listLeaderUserId,
+            overdueFirst: listOverdueFirst,
+            mentionLeaderOnly: true,
+            mentionFirst: listMentionFirst,
+            myDirectOnly: listMyDirectOnly
+          });
+        }}
+        onMentionFirstSort={() => {
+          setListMentionFirst(true);
+          setListSortMode("mentionFirst");
+          void loadPendingReports({
+            page: 1,
+            pageSize: listPageSize,
+            keyword: listKeywordInput.trim(),
+            departmentId: listDepartmentId,
+            leaderUserId: listLeaderUserId,
+            overdueFirst: listOverdueFirst,
+            mentionLeaderOnly: listMentionLeaderOnly,
+            mentionFirst: true,
+            myDirectOnly: listMyDirectOnly
+          });
+        }}
+        onOnlyMyDirect={() => {
+          setListMyDirectOnly(true);
+          void loadPendingReports({
+            page: 1,
+            pageSize: listPageSize,
+            keyword: listKeywordInput.trim(),
+            departmentId: listDepartmentId,
+            leaderUserId: listLeaderUserId,
+            overdueFirst: listOverdueFirst,
+            mentionLeaderOnly: listMentionLeaderOnly,
+            mentionFirst: listMentionFirst,
+            myDirectOnly: true
+          });
+        }}
+        onSearch={() => {
+          const nextKeyword = listKeywordInput.trim();
+          setListKeyword(nextKeyword);
+          void loadPendingReports({
+            page: 1,
+            pageSize: listPageSize,
+            keyword: nextKeyword,
+            departmentId: listDepartmentId,
+            leaderUserId: listLeaderUserId,
+            overdueFirst: listOverdueFirst,
+            mentionLeaderOnly: listMentionLeaderOnly,
+            mentionFirst: listMentionFirst,
+            myDirectOnly: listMyDirectOnly
+          });
+        }}
+        onSaveDefaults={() => {
+          persistListDefaults({
+            pageSize: listPageSize,
+            keyword: listKeywordInput.trim(),
+            departmentId: listDepartmentId,
+            leaderUserId: listLeaderUserId,
+            overdueFirst: listOverdueFirst,
+            mentionLeaderOnly: listMentionLeaderOnly,
+            mentionFirst: listMentionFirst,
+            myDirectOnly: listMyDirectOnly
+          });
+          setNotice("已保存为默认筛选");
+        }}
+        onRestoreDefaults={() => {
+          const next = readListFilterDefaults();
+          setListPageSize(next.pageSize);
+          setListKeywordInput(next.keyword);
+          setListKeyword(next.keyword);
+          setListDepartmentId(next.departmentId);
+          setListLeaderUserId(next.leaderUserId);
+          setListOverdueFirst(next.overdueFirst);
+          setListMentionLeaderOnly(next.mentionLeaderOnly);
+          setListMentionFirst(next.mentionFirst);
+          setListSortMode(deriveSortMode(next.overdueFirst, next.mentionFirst));
+          setListMyDirectOnly(next.myDirectOnly);
+          void loadPendingReports({
+            page: 1,
+            pageSize: next.pageSize,
+            keyword: next.keyword,
+            departmentId: next.departmentId,
+            leaderUserId: next.leaderUserId,
+            overdueFirst: next.overdueFirst,
+            mentionLeaderOnly: next.mentionLeaderOnly,
+            mentionFirst: next.mentionFirst,
+            myDirectOnly: next.myDirectOnly
+          });
+        }}
+        onReset={() => {
+          setListKeywordInput("");
+          setListKeyword("");
+          setListDepartmentId(undefined);
+          setListLeaderUserId(undefined);
+          setListOverdueFirst(false);
+          setListMentionLeaderOnly(false);
+          setListMentionFirst(false);
+          setListSortMode("default");
+          setListMyDirectOnly(false);
+          void loadPendingReports({
+            page: 1,
+            pageSize: listPageSize,
+            keyword: "",
+            departmentId: undefined,
+            leaderUserId: undefined,
+            overdueFirst: false,
+            mentionLeaderOnly: false,
+            mentionFirst: false,
+            myDirectOnly: false
+          });
+        }}
+        listPage={listPage}
+        listTotalPages={listTotalPages}
+        listStart={listStart}
+        listEnd={listEnd}
+        totalItems={totalItems}
+        defaultPageSize={savedListDefaults.pageSize}
+        activeFilterTagsCount={activeFilterTags.length}
+        listKeyword={listKeyword}
+        selectedDepartmentLabel={selectedDepartmentLabel}
+        selectedLeader={selectedLeader}
+        onClearKeywordTag={() => {
+          setListKeywordInput("");
+          setListKeyword("");
+          void loadPendingReports({
+            page: 1,
+            pageSize: listPageSize,
+            keyword: "",
+            departmentId: listDepartmentId,
+            leaderUserId: listLeaderUserId,
+            overdueFirst: listOverdueFirst,
+            mentionFirst: listMentionFirst,
+            myDirectOnly: listMyDirectOnly
+          });
+        }}
+        onClearDepartmentTag={() => {
+          setListDepartmentId(undefined);
+          void loadPendingReports({
+            page: 1,
+            pageSize: listPageSize,
+            keyword: listKeyword,
+            departmentId: undefined,
+            leaderUserId: listLeaderUserId,
+            overdueFirst: listOverdueFirst,
+            mentionFirst: listMentionFirst,
+            myDirectOnly: listMyDirectOnly
+          });
+        }}
+        onClearLeaderTag={() => {
+          setListLeaderUserId(undefined);
+          void loadPendingReports({
+            page: 1,
+            pageSize: listPageSize,
+            keyword: listKeyword,
+            departmentId: listDepartmentId,
+            leaderUserId: undefined,
+            overdueFirst: listOverdueFirst,
+            mentionFirst: listMentionFirst,
+            myDirectOnly: listMyDirectOnly
+          });
+        }}
+        onClearOverdueTag={() => {
+          setListOverdueFirst(false);
+          void loadPendingReports({
+            page: 1,
+            pageSize: listPageSize,
+            keyword: listKeyword,
+            departmentId: listDepartmentId,
+            leaderUserId: listLeaderUserId,
+            overdueFirst: false,
+            mentionLeaderOnly: listMentionLeaderOnly,
+            mentionFirst: listMentionFirst,
+            myDirectOnly: listMyDirectOnly
+          });
+        }}
+        onClearMentionLeaderTag={() => {
+          setListMentionLeaderOnly(false);
+          void loadPendingReports({
+            page: 1,
+            pageSize: listPageSize,
+            keyword: listKeyword,
+            departmentId: listDepartmentId,
+            leaderUserId: listLeaderUserId,
+            overdueFirst: listOverdueFirst,
+            mentionLeaderOnly: false,
+            mentionFirst: listMentionFirst,
+            myDirectOnly: listMyDirectOnly
+          });
+        }}
+        onClearMentionFirstTag={() => {
+          setListMentionFirst(false);
+          void loadPendingReports({
+            page: 1,
+            pageSize: listPageSize,
+            keyword: listKeyword,
+            departmentId: listDepartmentId,
+            leaderUserId: listLeaderUserId,
+            overdueFirst: listOverdueFirst,
+            mentionLeaderOnly: listMentionLeaderOnly,
+            mentionFirst: false,
+            myDirectOnly: listMyDirectOnly
+          });
+        }}
+        onClearMyDirectTag={() => {
+          setListMyDirectOnly(false);
+          void loadPendingReports({
+            page: 1,
+            pageSize: listPageSize,
+            keyword: listKeyword,
+            departmentId: listDepartmentId,
+            leaderUserId: listLeaderUserId,
+            overdueFirst: listOverdueFirst,
+            mentionLeaderOnly: listMentionLeaderOnly,
+            mentionFirst: listMentionFirst,
+            myDirectOnly: false
+          });
+        }}
+        onClearAllTags={() => {
+          setListKeywordInput("");
+          setListKeyword("");
+          setListDepartmentId(undefined);
+          setListLeaderUserId(undefined);
+          setListOverdueFirst(false);
+          setListMentionLeaderOnly(false);
+          setListMentionFirst(false);
+          setListSortMode("default");
+          setListMyDirectOnly(false);
+          void loadPendingReports({
+            page: 1,
+            pageSize: listPageSize,
+            keyword: "",
+            departmentId: undefined,
+            leaderUserId: undefined,
+            overdueFirst: false,
+            mentionLeaderOnly: false,
+            mentionFirst: false,
+            myDirectOnly: false
+          });
+        }}
+      />
       {!loading && !error ? (
         <ReviewsEfficiencyPanel
           overdueTodoCount={overdueTodoCount}

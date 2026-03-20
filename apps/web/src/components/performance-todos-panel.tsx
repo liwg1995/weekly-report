@@ -13,13 +13,8 @@ type Props = {
 export default function PerformanceTodosPanel(props: Props) {
   return (
     <section
-      style={{
-        marginTop: "14px",
-        border: "1px solid var(--border)",
-        borderRadius: "12px",
-        padding: "12px",
-        background: "var(--surface)"
-      }}
+      className="ui-panel"
+      style={{ marginTop: "14px" }}
     >
       <div className="ui-section-head">
         <h2>待办清单（占位）</h2>

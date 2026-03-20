@@ -325,26 +325,36 @@ button:disabled {
 .ui-section-head {
   display: grid;
   gap: 4px;
-  margin-bottom: 10px;
+  margin-bottom: 12px;
 }
 
 .ui-section-head h2 {
   margin: 0;
-  font-size: 16px;
+  font-size: 17px;
+  line-height: 1.35;
 }
 
 .ui-section-desc {
   margin: 0;
   color: var(--muted);
   font-size: 12px;
+  line-height: 1.45;
 }
 
 .ui-subsection-card {
   border: 1px dashed var(--border);
   border-radius: var(--radius-sm);
-  padding: 10px;
-  margin-bottom: 10px;
+  padding: 12px;
+  margin-bottom: 12px;
   background: #fbfdff;
+}
+
+.ui-panel {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 12px;
+  background: var(--surface);
+  box-shadow: var(--shadow-sm);
 }
 
 .ui-empty-state {

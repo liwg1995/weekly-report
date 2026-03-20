@@ -59,7 +59,7 @@ type Props = {
 
 export default function OrgUserPanel(props: Props) {
   return (
-    <section style={{ border: "1px solid var(--border)", borderRadius: "12px", padding: "12px" }}>
+    <section className="ui-panel">
       <div className="ui-section-head">
         <h2>员工与归属设置</h2>
         <p className="ui-section-desc">按“创建员工 → 绑定部门 → 设置直属领导”的顺序配置更顺手。</p>

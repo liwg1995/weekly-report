@@ -72,7 +72,7 @@ type Props = {
 
 export default function ReviewsFilterPanel(props: Props) {
   return (
-    <section className="reviews-filter-panel" style={{ marginBottom: "12px", padding: "12px" }}>
+    <section className="reviews-filter-panel ui-panel" style={{ marginBottom: "12px" }}>
       <h2 style={{ marginTop: 0, fontSize: "16px" }}>列表筛选</h2>
       <div className="reviews-filter-controls" style={{ display: "flex", flexWrap: "wrap", gap: "8px", alignItems: "center" }}>
         <input

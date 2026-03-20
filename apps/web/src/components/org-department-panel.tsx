@@ -48,7 +48,7 @@ type Props = {
 
 export default function OrgDepartmentPanel(props: Props) {
   return (
-    <section style={{ border: "1px solid var(--border)", borderRadius: "12px", padding: "12px" }}>
+    <section className="ui-panel">
       <div className="ui-section-head">
         <h2>部门设置</h2>
         <p className="ui-section-desc">先创建部门结构，再配置负责人与默认周报提交日。</p>
